@@ -1,12 +1,12 @@
 # Moz Checker — C# / WPF for Windows 11
 
-Versi desktop berikutnya (0.3.0 development) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). Rilis publik tetap ditahan selama investigasi Defender belum selesai.
+Versi desktop C# (v0.3.0 Preview) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). [Unduh v0.3.0 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.3.0). Publikasi preview ini dibatasi ke paket C# yang telah diverifikasi; investigasi paket Python lama masih terbuka.
 
 Implementasi Python di bawah dipertahankan sebagai referensi versi 0.2.0; perintah Python bukan cara menjalankan desktop WPF baru.
 
 # Expired Domain Checker
 
-> **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Publikasi rilis baru ditahan. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).
+> **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Paket lama tetap dalam investigasi; v0.3.0 C# diterbitkan sebagai preview dengan bukti pengujian dan batasannya. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).
 
 Aplikasi desktop Windows untuk riset expired domain. Data hunting dan cache berada di SQLite lokal; key berada di credential vault sistem. Tidak ada server pusat, pembelian domain otomatis, atau scraping tool SEO.
 

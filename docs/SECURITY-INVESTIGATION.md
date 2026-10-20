@@ -2,7 +2,7 @@
 
 A user reported Microsoft Defender blocking/quarantining `MozChecker.exe` as **Behavior:Win32/DefenseEvasion.A!ml**, severity **Severe**. This is a behavioral detection, not merely SmartScreen warning about an unknown publisher. The user confirmed Windows 11. The exact detected release version has not yet been confirmed.
 
-**Do not allow, restore, run the quarantined file, add exclusions, or disable antivirus. No replacement binary has been cleared for distribution.** Automatic publication is blocked by `release-security.json` and the publisher checks this before calling GitHub. A warning is present on the v0.2.0 release. Keep the block until the report is resolved; do not remove it merely because functional tests pass or another scan is negative.
+**Do not allow, restore, run the quarantined file, add exclusions, or disable antivirus. No vendor determination has cleared the reported Python sample or established a false positive.** Unreviewed publication is blocked by `release-security.json`; the only exception is the exact separately implemented C# preview build/digest explicitly authorized for publication. A warning is present on the v0.2.0 release. The default block and old-release warning remain. The C# preview exception does not close the Python investigation.
 
 ## Published sample under investigation
 
@@ -27,7 +27,7 @@ A user reported Microsoft Defender blocking/quarantining `MozChecker.exe` as **B
 - Compare endpoint Defender engine/security-intelligence versions and affected-item details with the audit evidence.
 - Obtain a vendor determination through [Microsoft's official file-submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission), using the published sample, hashes, detection name and source/build details. No sample or support message has been submitted on the user's behalf.
 
-Do not repack/rename the executable just to escape detection, sign an unresolved sample as a substitute for analysis, or describe old functional CI as antivirus clearance. Future build validation enables protection, verifies coverage and records Defender evidence before executing a packaged smoke test; it fails instead of claiming a clean result if protection/coverage is unavailable. Publication remains on hold even if that limited check passes.
+Do not repack/rename the executable just to escape detection, sign an unresolved sample as a substitute for analysis, or describe old functional CI as antivirus clearance. Future build validation enables protection, verifies coverage and records Defender evidence before executing a packaged smoke test; it fails instead of claiming a clean result if protection/coverage is unavailable. A passing check alone cannot authorize publication; an explicit version/build/source/digest review entry is also required.
 
 ## C# / WPF development migration
 
@@ -35,4 +35,8 @@ The user agreed to migrate the Windows application to C#/.NET WPF. The developme
 
 [Final native build](https://github.com/bisrib613/moz-checker/actions/runs/39400588371) from `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3` passed 37 core tests on both Windows and Linux. Protected Windows startup/scan completed with no detections on that runner; real-time and behavior protection remained active. All 21 managed/native/license files tested by the helper match the packaged ZIP by SHA-256. The ZIP is 1,607,957 bytes, excluding the separately installed runtime. [Recorded evidence](security/v0.3.0-wpf-evidence.json) includes the package hash, DLL/EXE hashes, Defender settings and limitations.
 
-The runner uses Windows Server, cloud reporting remains off, no real API keys were used, and this does not reproduce the user's Windows 11 endpoint or cover every application action. No sample has been submitted to Microsoft on the user's behalf. Public release remains on hold.
+The runner uses Windows Server, cloud reporting remains off, no real API keys were used, and this does not reproduce the user's Windows 11 endpoint or cover every application action. No sample has been submitted to Microsoft on the user's behalf. The user subsequently requested completion and publication. Only the exact v0.3.0 C# build was authorized as a preview, with these limitations disclosed; all unreviewed releases remain blocked.
+
+## Preview publication decision
+
+The explicit request to finish publishing authorizes v0.3.0 from build `39400588371`, source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`, ZIP SHA-256 `abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f`. The publisher independently fetches the successful CI artifacts, verifies the pinned source/hash, active Defender evidence, WPF smoke and every packaged file. Release notes disclose that the old detection is unresolved and that runner checks are limited. The Python warning and default publication block remain; nothing is renamed, restored from quarantine or exempted from antivirus.

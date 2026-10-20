@@ -1,5 +1,13 @@
 {
   "publishing_blocked": true,
   "reason": "User endpoint quarantined MozChecker.exe as Behavior:Win32/DefenseEvasion.A!ml (Severe). Investigation unresolved; do not publish a replacement or bypass antivirus based only on functional/static scan results.",
-  "reported_version_under_test": "v0.2.0"
+  "reported_version_under_test": "v0.2.0",
+  "reviewed_releases": {
+    "v0.3.0": {
+      "build_run_id": "39400588371",
+      "source_commit": "aa5b912d58abaa115bd8abe674d0ff926ff0d9e3",
+      "package_sha256": "abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f",
+      "decision": "User requested completion and publication of the separately implemented C#/WPF preview. Limited protected runner checks passed. Earlier Python endpoint detection remains unresolved; no antivirus-clearance or false-positive claim."
+    }
+  }
 }
