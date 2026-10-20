@@ -19,7 +19,7 @@ The build is **framework-dependent**: install Microsoft's **.NET 10 Desktop Runt
 
 Core tests exercise normalization, PSL exceptions, Python-compatible JSON/SQLite, backup, availability evidence, stale availability refresh before Moz, source failure isolation, no duplicate billing, quota races, cancellation/resume, CSV, and a 1,000-domain pipeline. Native WPF smoke uses a fresh temporary profile with simulated rows, checks the available/log separation, search/reset and export state, and requests normal/minimum window sizes. The runner display can constrain the actual window bounds; its captured render is 1040×768, so a full 1440×900 display and high-DPI layout remain manual checks. Fixtures are never inserted into real user data.
 
-The Windows build is scanned before startup. Real-time and behavior protection must be active, applicable runner exclusions removed only on the disposable GitHub VM, firewall profiles enabled, and outbound traffic blocked for the smoke executable. Scan/startup evidence is retained. These checks do **not** replicate the user's Windows 11 cloud ML behavior, establish a false positive, or resolve the previous detection. `release-security.json` blocks unreviewed releases; v0.3.0 is the single explicitly authorized preview, pinned to its tested build/source/package hash.
+The Windows build is scanned before startup. Real-time and behavior protection must be active, applicable runner exclusions removed only on the disposable GitHub VM, firewall profiles enabled, and outbound traffic blocked for the smoke executable. Scan/startup evidence is retained. These checks do **not** replicate the user's Windows 11 cloud ML behavior, establish a false positive, or resolve the previous detection. `release-security.json` blocks unreviewed releases; preview exceptions are pinned individually to their tested build/source/package hashes.
 
 Paid provider integration with real API keys, representative end-to-end live hunting, screen-reader behavior, high DPI and existing-user Credential Manager migration remain manual validation work. The user subsequently authorized publication of v0.3.0 as a preview; this is not a security-clearance determination for the earlier sample.
 
@@ -42,7 +42,7 @@ Native WPF empty workspace captured from the protected Windows smoke run (no rea
 
 ![Native WPF workspace](desktop-wpf.png)
 
-Verified native build: [39400588371](https://github.com/bisrib613/moz-checker/actions/runs/39400588371), source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`; 37 tests on each OS, protected WPF smoke passed. The final ZIP is 1,607,957 bytes (about 1.6 MB), excluding the required .NET Desktop Runtime. All 21 payload files match the protected test copy. See [evidence](security/v0.3.0-wpf-evidence.json). Publication is allowed only for the exact reviewed v0.3.0 preview; the previous investigation remains open.
+Verified native build: [39400588371](https://github.com/bisrib613/moz-checker/actions/runs/39400588371), source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`; 37 tests on each OS, protected WPF smoke passed. The final ZIP is 1,607,957 bytes (about 1.6 MB), excluding the required .NET Desktop Runtime. All 21 payload files match the protected test copy. See [evidence](security/v0.3.0-wpf-evidence.json). Publication is allowed only for exact reviewed previews; the previous investigation remains open.
 
 ## 0.3.1 CSV import fix
 

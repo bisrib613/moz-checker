@@ -2,7 +2,7 @@
 
 A user reported Microsoft Defender blocking/quarantining `MozChecker.exe` as **Behavior:Win32/DefenseEvasion.A!ml**, severity **Severe**. This is a behavioral detection, not merely SmartScreen warning about an unknown publisher. The user confirmed Windows 11. The exact detected release version has not yet been confirmed.
 
-**Do not allow, restore, run the quarantined file, add exclusions, or disable antivirus. No vendor determination has cleared the reported Python sample or established a false positive.** Unreviewed publication is blocked by `release-security.json`; the only exception is the exact separately implemented C# preview build/digest explicitly authorized for publication. A warning is present on the v0.2.0 release. The default block and old-release warning remain. The C# preview exception does not close the Python investigation.
+**Do not allow, restore, run the quarantined file, add exclusions, or disable antivirus. No vendor determination has cleared the reported Python sample or established a false positive.** Unreviewed publication is blocked by `release-security.json`; exceptions are limited to exact C# preview build/digest entries explicitly reviewed for publication. A warning is present on the v0.2.0 release. The default block and old-release warning remain. The C# preview exception does not close the Python investigation.
 
 ## Published sample under investigation
 
@@ -44,3 +44,7 @@ The explicit request to finish publishing authorizes v0.3.0 from build `39400588
 ## Publication outcome
 
 [v0.3.0 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.3.0) was published with the unchanged reviewed ZIP, checksum manifest and `SECURITY-VALIDATION.json`. Integration permissions prevented release metadata creation, so the owner created the pinned draft; [workflow 39408332689](https://github.com/bisrib613/moz-checker/actions/runs/39408332689) verified and uploaded the assets. The downloaded draft assets, source, release notes and GitHub digests were independently checked before owner publication. Release ID: `418273912`; ZIP SHA-256 remains `abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f`. The Python investigation and default block for unreviewed releases remain open.
+
+## 0.3.1 import fix publication
+
+[v0.3.1 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.3.1) publishes the immediate CSV parsing / large-list batching fix from source `610a22667ba523c53abe35f03184e4f1da051d17`, build `39413042597`. All 45 core tests passed on Windows and Linux; protected WPF smoke additionally checks immediate CSV extraction and retention of a 1,001-domain import. The complete payload matches the protected copy; ZIP SHA-256 is `918482ad6d1784ea02278e32860eed1090510dd666a5633f8b98116cac042e1a` (1,612,412 bytes). [Publisher workflow](https://github.com/bisrib613/moz-checker/actions/runs/39413465942) staged the reviewed assets; downloaded asset hashes, notes and source were independently checked before owner publication of release ID `418309532`. [Evidence](security/v0.3.1-wpf-evidence.json). Prior endpoint-investigation limitations remain unchanged.
