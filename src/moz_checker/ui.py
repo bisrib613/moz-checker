@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar,
-    QPushButton, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QPushButton, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from . import secrets
@@ -210,8 +210,6 @@ class Window(QMainWindow):
         self.stage_progress = QLabel()
         results_layout.addWidget(self.stage_progress)
         filters = QGridLayout()
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(['Semua status', 'available', 'registered', 'redemption', 'pending delete', 'unknown'])
         self.history_filter = QComboBox()
         self.history_filter.addItems(['Semua riwayat', 'valid', 'no_history', 'invalid', 'unchecked'])
         self.tld_filter = QLineEdit()
@@ -229,7 +227,7 @@ class Window(QMainWindow):
         self.min_snap = QSpinBox()
         self.min_snap.setRange(0, 10000)
         self.min_snap.setPrefix('Snapshot ≥ ')
-        for col, widget in enumerate([self.status_filter, self.history_filter, self.tld_filter,
+        for col, widget in enumerate([self.history_filter, self.tld_filter,
                                       self.min_opr, self.min_da, self.max_len, self.min_snap]):
             filters.addWidget(widget, 0, col)
             if isinstance(widget, QComboBox):
@@ -248,7 +246,20 @@ class Window(QMainWindow):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self.show_evidence)
-        results_layout.addWidget(self.table)
+        self.tabs = QTabWidget()
+        self.results_page = QWidget()
+        main_results = QVBoxLayout(self.results_page)
+        main_results.setContentsMargins(0, 0, 0, 0)
+        self.empty_results = QLabel('Belum ada domain available. Lihat Log pemeriksaan untuk hasil lainnya.')
+        self.empty_results.setObjectName('subtle')
+        main_results.addWidget(self.empty_results)
+        main_results.addWidget(self.table)
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setPlaceholderText('Status dan bukti setiap domain akan tampil di sini, termasuk yang tidak available.')
+        self.tabs.addTab(self.results_page, 'Hasil available')
+        self.tabs.addTab(self.log, 'Log pemeriksaan')
+        results_layout.addWidget(self.tabs)
         self.evidence = QPlainTextEdit()
         self.evidence.setReadOnly(True)
         self.evidence.setMaximumHeight(145)
@@ -388,7 +399,7 @@ class Window(QMainWindow):
         results = self.store.results(self.current) if self.current else []
         tld = self.tld_filter.text().strip().lower().lstrip('.')
         return [r for r in results
-                if (self.status_filter.currentIndex() == 0 or r.status == self.status_filter.currentText())
+                if r.status == 'available'
                 and (self.history_filter.currentIndex() == 0 or r.history == self.history_filter.currentText())
                 and (not tld or r.domain.endswith('.' + tld))
                 and (self.min_opr.value() == 0 or (r.opr is not None and r.opr >= self.min_opr.value()))
@@ -406,11 +417,34 @@ class Window(QMainWindow):
         self.progress.setRange(0, max(1, len(all_results)))
         self.progress.setValue(done)
         self.progress.setFormat(f'{done} / {len(all_results)} domain selesai')
-        self.stage_progress.setText(f'Ketersediaan: {sum(bool(r.availability_at) for r in all_results)}  ·  '
+        checked = sum(bool(r.availability_at) or r.stage in ('history', 'moz_queued', 'done') for r in all_results)
+        available = sum(r.status == 'available' for r in all_results)
+        registered = sum(r.status == 'registered' for r in all_results)
+        self.stage_progress.setText(f'Sudah diperiksa: {checked}  ·  Available: {available}  ·  Registered: {registered}  ·  '
                                     f'OPR: {sum(r.opr is not None for r in all_results)}  ·  '
                                     f'Riwayat: {sum(bool(r.history) for r in all_results)}  ·  '
                                     f'Moz: {sum(bool(r.moz_at) for r in all_results)}')
+        lines = []
+        for result in all_results:
+            timestamp = result.availability_at or 'waktu belum tersedia'
+            state = 'menunggu' if result.stage == 'queued' else result.status
+            lines.append(f'[{timestamp}] {result.domain} | {state} | tahap={result.stage} | '
+                         f'RDAP={result.rdap_http if result.rdap_http is not None else "—"} | '
+                         f'DNS={result.dns or "—"} | RDAP URL={result.rdap_url or "—"}' +
+                         (' | kesalahan=' + json.dumps(result.errors, ensure_ascii=False) if result.errors else ''))
+        log_text = '\n'.join(lines)
+        if self.log.toPlainText() != log_text:
+            scrollbar = self.log.verticalScrollBar()
+            at_end = scrollbar.value() == scrollbar.maximum()
+            position = scrollbar.value()
+            self.log.setPlainText(log_text)
+            scrollbar.setValue(scrollbar.maximum() if at_end else position)
         rows = self.visible_results()
+        self.tabs.setTabText(0, f'Hasil available ({available})')
+        self.tabs.setTabText(1, f'Log pemeriksaan ({len(all_results)})')
+        self.empty_results.setVisible(not rows)
+        self.empty_results.setText('Tidak ada domain available yang cocok dengan filter.' if available else
+                                   'Belum ada domain available. Lihat Log pemeriksaan untuk hasil lainnya.')
         self.table.blockSignals(True)
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(rows))
