@@ -25,26 +25,74 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
     private readonly ConcurrentDictionary<string, RateGate> rdapGates = new();
     private readonly SemaphoreSlim bootstrapLock = new(1, 1);
     private JsonNode? bootstrap;
+    private DateTimeOffset? bootstrapLoadedAt;
+    private DateTimeOffset? bootstrapDownloadAttempt;
+    private string? bootstrapRefreshFailure;
     private readonly LookupClient dns = new(new LookupClientOptions { Timeout = TimeSpan.FromSeconds(5), Retries = 0, UseCache = false, ThrowDnsErrors = false });
-    private async Task<JsonNode> BootstrapAsync(CancellationToken ct)
+    private static bool ValidBootstrap(JsonNode? value) => value is JsonObject && value["services"] is JsonArray { Count: > 0 };
+    private async Task<JsonNode> BootstrapAsync(CancellationToken ct, bool refreshMissing = false)
     {
         await bootstrapLock.WaitAsync(ct);
         try
         {
-            if (bootstrap is not null)
+            if (bootstrapLoadedAt is null || DateTimeOffset.UtcNow - bootstrapLoadedAt > TimeSpan.FromDays(7))
+            {
+                var cached = store.CacheGet<JsonNode>("iana", "bootstrap", 7 * 86400);
+                bootstrap = ValidBootstrap(cached) ? cached : null;
+                bootstrapLoadedAt = DateTimeOffset.UtcNow;
+            }
+            if (bootstrap is not null && !refreshMissing)
                 return bootstrap;
-            bootstrap = store.CacheGet<JsonNode>("iana", "bootstrap", 7 * 86400);
-            if (bootstrap is null)
+            // A missing TLD in an older cache deserves a fresh official list, but
+            // thousands of unsupported domains must not trigger thousands of downloads.
+            if (refreshMissing && bootstrap is not null && bootstrapDownloadAttempt is { } attempted && DateTimeOffset.UtcNow - attempted < TimeSpan.FromMinutes(15))
+            {
+                if (bootstrapRefreshFailure is not null)
+                    throw new SourceException(bootstrapRefreshFailure);
+                return bootstrap;
+            }
+            bootstrapDownloadAttempt = DateTimeOffset.UtcNow;
+            try
             {
                 var downloaded = (await http.SendAsync(() => new(HttpMethod.Get, "https://data.iana.org/rdap/dns.json"), null, ct)).Json();
-                if (downloaded is not JsonObject || downloaded["services"] is not JsonArray)
+                if (!ValidBootstrap(downloaded))
                     throw new SourceException("Bootstrap IANA tidak valid");
+                store.CachePut("iana", "bootstrap", downloaded);
                 bootstrap = downloaded;
-                store.CachePut("iana", "bootstrap", bootstrap);
+                bootstrapLoadedAt = DateTimeOffset.UtcNow;
+                bootstrapRefreshFailure = null;
             }
-            return bootstrap;
+            catch (SourceException ex)
+            {
+                bootstrapRefreshFailure = "Pembaruan daftar RDAP IANA gagal; dukungan TLD belum dapat dipastikan: " + ex.Message;
+                throw new SourceException(bootstrapRefreshFailure);
+            }
+            return bootstrap!;
         }
         finally { bootstrapLock.Release(); }
+    }
+    private static Uri? FindRdapRoute(JsonNode data, string domain)
+    {
+        var tld = domain.Split('.')[^1];
+        foreach (var entry in data["services"]!.AsArray())
+        {
+            if (entry is not JsonArray { Count: 2 } service || service[0] is not JsonArray tlds || service[1] is not JsonArray urls || !tlds.Any(t => t is JsonValue v && v.TryGetValue<string>(out var name) && string.Equals(name, tld, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            foreach (var value in urls)
+                if (value is JsonValue v && v.TryGetValue<string>(out var url))
+                {
+                    try { return RdapUri(url, domain); }
+                    catch (SourceException) { /* Try the next official HTTPS route. */ }
+                }
+        }
+        return null;
+    }
+    public async Task<Uri?> ResolveRdapAsync(string domain, CancellationToken ct)
+    {
+        var current = await BootstrapAsync(ct);
+        if (FindRdapRoute(current, domain) is { } route)
+            return route;
+        return FindRdapRoute(await BootstrapAsync(ct, refreshMissing: true), domain);
     }
     public static Uri RdapUri(string baseUrl, string domain)
     {
@@ -95,6 +143,7 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
         result.AvailabilityAt = JsonData.Now();
         result.RdapHttp = null;
         result.RdapUrl = "";
+        result.Dns = "";
         result.Expires = "";
         result.Registrar = "";
         if (!Domains.Registrable(result.Domain))
@@ -102,16 +151,14 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
             result.Errors["availability"] = "Domain tidak dikenali Public Suffix List";
             return;
         }
-        result.Dns = await DnsAsync(result.Domain, ct);
-        var bootstrap = await BootstrapAsync(ct);
-        var route = bootstrap["services"]!.AsArray().Where(x => x is JsonArray a && a.Count == 2 && a[0] is JsonArray tlds && a[1] is JsonArray && tlds.Any(t => t?.ToString() == result.Domain.Split('.')[^1])).SelectMany(x => x![1]!.AsArray()).Select(x => x!.ToString()).FirstOrDefault(x => x.StartsWith("https://"));
-        if (route is null)
+        var uri = await ResolveRdapAsync(result.Domain, ct);
+        if (uri is null)
         {
-            result.Errors["availability"] = "TLD tanpa RDAP HTTPS; WHOIS belum didukung";
+            result.Errors["availability"] = $".{result.Domain.Split('.')[^1]}: rute RDAP HTTPS tidak ditemukan setelah pembaruan daftar IANA; WHOIS belum didukung. Status belum diketahui.";
             return;
         }
-        var uri = RdapUri(route, result.Domain);
         result.RdapUrl = uri.AbsoluteUri;
+        result.Dns = await DnsAsync(result.Domain, ct);
         var reply = await http.SendAsync(() => new(HttpMethod.Get, uri), rdapGates.GetOrAdd(uri.Host, _ => new(TimeSpan.FromSeconds(.5))), ct);
         result.RdapHttp = reply.Status;
         JsonNode? body;
