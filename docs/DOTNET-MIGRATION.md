@@ -41,3 +41,5 @@ The embedded ICANN Public Suffix List comes from the same MPL-2.0 snapshot bundl
 Native WPF empty workspace captured from the protected Windows smoke run (no real domain data):
 
 ![Native WPF workspace](desktop-wpf.png)
+
+Verified native build: [39400588371](https://github.com/bisrib613/moz-checker/actions/runs/39400588371), source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`; 37 tests on each OS, protected WPF smoke passed. The final ZIP is 1,607,957 bytes (about 1.6 MB), excluding the required .NET Desktop Runtime. All 21 payload files match the protected test copy. See [evidence](security/v0.3.0-wpf-evidence.json). Publication remains blocked.
