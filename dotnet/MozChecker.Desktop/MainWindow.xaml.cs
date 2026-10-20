@@ -16,12 +16,14 @@ public partial class MainWindow : Window
     {
         public override string ToString() => Label;
     }
-    private sealed record Snapshot(List<Job> Jobs, WorkspaceCounts Counts, ResultPage? Results, EventPage? Events);
+    private sealed record Snapshot(List<Job> Jobs, WorkspaceCounts Counts, ResultPage? Results, EventPage? Events, Settings? Settings = null, int Used = 0);
     private readonly Store store;
     private readonly Transport transport = new();
     private Engine engine;
     private readonly bool smokeMode;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly CancellationTokenSource inputCancel = new();
+    private bool initialView = true;
     private bool closing, closedAfterStop, updating, refreshing, preparing;
     private Task? inputWork, refreshWork;
     private ImportResult? preparedImport;
@@ -47,7 +49,7 @@ public partial class MainWindow : Window
             timer.Start();
         ResultsGrid.SelectionChanged += (_, _) => EvidenceButton.IsEnabled = ResultsGrid.SelectedItem is Result;
         AddShortcut(Key.F, () => Search.Focus());
-        AddShortcut(Key.Enter, () => StartClick(this, new()));
+        AddShortcut(Key.Enter, () => { if (ResumeButton.IsEnabled && DomainInput.Text.Length == 0) ResumeClick(this, new()); else StartClick(this, new()); });
         AddShortcut(Key.O, () => ImportClick(this, new()));
         AddShortcut(Key.OemComma, () => SettingsClick(this, new()));
         Closing += OnClosing;
@@ -74,7 +76,12 @@ public partial class MainWindow : Window
             var binding = new Binding(property) { TargetNullValue = "—" };
             if (format is not null)
                 binding.StringFormat = format;
-            ResultsGrid.Columns.Add(new DataGridTextColumn { Header = title, Binding = binding, SortMemberPath = property, Width = new DataGridLength(width) });
+            var textStyle = new Style(typeof(TextBlock));
+            textStyle.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
+            textStyle.Setters.Add(new Setter(TextBlock.PaddingProperty, new Thickness(0, 2, 0, 0)));
+            if (property == "Domain")
+                textStyle.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.SemiBold));
+            ResultsGrid.Columns.Add(new DataGridTextColumn { Header = title, Binding = binding, ElementStyle = textStyle, SortMemberPath = property, Width = new DataGridLength(width) });
         }
         Column("Domain", "Domain", 190);
         if (ResultTabs.SelectedIndex == 0)
@@ -121,15 +128,31 @@ public partial class MainWindow : Window
         var revision = request;
         try
         {
-            var work = Task.Run(() => store.ReadConsistent(s => new Snapshot(s.Jobs(), s.Counts(selected), tab == 3 ? null : s.Page(selected, tab, filter, selectedPage, PageSize, selectedSort, desc), tab == 3 ? s.Events(selected, filter.Search, selectedPage, anchor, PageSize) : null)));
+            var work = Task.Run(() => store.ReadConsistent(s =>
+            {
+                var settings = s.GetSettings();
+                return new Snapshot(s.Jobs(), s.Counts(selected), tab == 3 ? null : s.Page(selected, tab, filter, selectedPage, PageSize, selectedSort, desc), tab == 3 ? s.Events(selected, filter.Search, selectedPage, anchor, PageSize) : null, settings, s.Used(settings.Period));
+            }));
             refreshWork = work;
             var snapshot = await work;
-            if (closing || revision != request)
+            if (closing || preparing || revision != request)
                 return;
+            var total = snapshot.Events?.Total ?? snapshot.Results?.Total ?? 0;
+            if (page > 0 && (long)page * PageSize >= total)
+            {
+                page = total == 0 ? 0 : (int)((total - 1) / PageSize);
+                request++;
+                return;
+            }
             Render(snapshot);
         }
         catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException) { if (!closing) ViewStatus.Text = "Pembacaan data gagal; coba muat ulang. " + ex.GetType().Name; }
-        finally { refreshing = false; }
+        finally
+        {
+            refreshing = false;
+            if (!closing && !preparing && revision != request)
+                _ = Dispatcher.BeginInvoke(async () => await RefreshAsync());
+        }
     }
     private void Render(Snapshot snapshot)
     {
@@ -142,6 +165,18 @@ public partial class MainWindow : Window
             lastJobs = jobsSignature;
         }
         var c = snapshot.Counts;
+        if (initialView && !smokeMode)
+        {
+            initialView = false;
+            InputPanel.IsExpanded = c.Total == 0;
+            if (c.Total > 0) Search.Focus(); else DomainInput.Focus();
+        }
+        var scopedJobs = snapshot.Jobs.Where(j => scope is null || j.Id == scope).ToList();
+        var resumable = scopedJobs.Count(j => j.State is "paused" or "queued");
+        ResumeBanner.Visibility = !engine.Running && c.Pending > 0 && resumable > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ResumeTitle.Text = $"{c.Pending:N0} domain siap dilanjutkan";
+        ResumeHint.Text = $"{resumable:N0} pemeriksaan tersimpan · {c.Done:N0} domain selesai tetap disimpan. Tidak perlu impor ulang.";
+        ProgressPercent.Text = c.Total == 0 ? "" : $"{100.0 * c.Done / c.Total:F1}%";
         Progress.Maximum = Math.Max(1, c.Total);
         Progress.Value = c.Done;
         ProgressText.Text = $"Total {c.Total:N0} · Selesai {c.Done:N0} · Belum selesai {c.Pending:N0} · Menunggu {Math.Max(0, c.Pending - c.Active):N0} · Diproses {c.Active:N0}";
@@ -178,11 +213,13 @@ public partial class MainWindow : Window
         ExportButton.IsEnabled = !preparing && !logView && ResultTabs.SelectedIndex == 0 && rowCount > 0;
         EvidenceButton.IsEnabled = !logView && ResultsGrid.SelectedItem is Result;
         PauseButton.IsEnabled = engine.Running;
-        ResumeButton.IsEnabled = !engine.Running && snapshot.Jobs.Any(j => (scope is null || j.Id == scope) && j.State is "paused" or "queued");
-        RetryButton.IsEnabled = !engine.Running && c.Total > 0;
-        var settings = store.GetSettings();
-        var used = store.Used(settings.Period);
-        QuotaText.Text = $"Moz lokal: {used}/{settings.MozBudget} · cadangan {settings.MozReserve}";
+        ResumeButton.IsEnabled = !preparing && !engine.Running && snapshot.Jobs.Any(j => (scope is null || j.Id == scope) && j.State is "paused" or "queued");
+        RetryButton.IsEnabled = !preparing && !engine.Running && c.Total > 0;
+        SettingsButton.IsEnabled = !preparing && !engine.Running;
+        LatestButton.Visibility = logView ? Visibility.Visible : Visibility.Collapsed;
+        FilterButton.IsEnabled = !logView;
+        var settings = snapshot.Settings ?? new Settings();
+        QuotaText.Text = $"Moz lokal {snapshot.Used}/{settings.MozBudget} · cadangan {settings.MozReserve} · RDAP/DNS ×{settings.AvailabilityWorkers}";
         StartButton.Content = engine.Running ? "Antrekan daftar baru" : "Mulai pemeriksaan";
         updating = false;
     }
@@ -255,10 +292,11 @@ public partial class MainWindow : Window
     private void SetPreparing(bool value, string? message = null)
     {
         preparing = value;
-        StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = !value;
+        StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = NewInputButton.IsEnabled = GenerateButton.IsEnabled = !value;
+        ResumeButton.IsEnabled = RetryButton.IsEnabled = SettingsButton.IsEnabled = !value && !engine.Running;
         ExportButton.IsEnabled = !value && ResultTabs.SelectedIndex == 0 && rowCount > 0;
         if (message is not null)
-            InputFeedback.Text = message;
+            OperationStatus.Text = InputFeedback.Text = message;
     }
     private void InputChanged(object sender, TextChangedEventArgs e)
     {
@@ -320,7 +358,7 @@ public partial class MainWindow : Window
         SetPreparing(true, "Menyimpan seluruh daftar pemeriksaan…");
         try
         {
-            var work = Task.Run(() => { var parsed = cached ?? Domains.Parse(text); if (parsed.Domains.Count == 0) throw new ArgumentException("Masukkan minimal satu domain valid."); return (Job: store.NewJob(parsed.Domains), Count: parsed.Domains.Count); });
+            var work = Task.Run(() => { var parsed = cached ?? Domains.Parse(text); if (parsed.Domains.Count == 0) throw new ArgumentException("Masukkan minimal satu domain valid."); return (Job: store.NewJob(parsed.Domains, inputCancel.Token), Count: parsed.Domains.Count); });
             inputWork = work;
             var created = await work;
             if (closing)
@@ -328,11 +366,12 @@ public partial class MainWindow : Window
             scope = created.Job;
             lastJobs = "";
             ResetPage();
-            InputFeedback.Text = $"{created.Count:N0} domain dalam satu pemeriksaan.";
+            OperationStatus.Text = InputFeedback.Text = $"{created.Count:N0} domain disimpan; pemeriksaan dimulai.";
             InputPanel.IsExpanded = false;
             engine.Start();
         }
-        catch (Exception ex) when (ex is ArgumentException or Microsoft.Data.Sqlite.SqliteException or IOException) { if (!closing) InputFeedback.Text = ex is ArgumentException ? ex.Message : "Daftar belum dapat disimpan. Tidak ada pemeriksaan parsial dibuat."; }
+        catch (OperationCanceledException) when (closing) { }
+        catch (Exception ex) when (ex is ArgumentException or Microsoft.Data.Sqlite.SqliteException or IOException) { if (!closing) OperationStatus.Text = InputFeedback.Text = ex is ArgumentException ? ex.Message : "Daftar belum dapat disimpan. Tidak ada pemeriksaan parsial dibuat."; }
         finally { if (!closing) { SetPreparing(false); await RefreshAsync(); } }
     }
     private async void GenerateClick(object sender, RoutedEventArgs e)
@@ -362,10 +401,21 @@ public partial class MainWindow : Window
     {
         if (engine.Running || preparing)
             return;
-        store.Resume(scope);
-        engine.Start();
-        request++;
-        await RefreshAsync();
+        var selected = scope;
+        SetPreparing(true, "Melanjutkan tahap yang tersimpan…");
+        try
+        {
+            inputWork = Task.Run(() => store.Resume(selected));
+            await inputWork;
+            if (!closing)
+            {
+                InputPanel.IsExpanded = false;
+                engine.Start(selected);
+                OperationStatus.Text = "Pemeriksaan dilanjutkan dari tahap tersimpan. Domain selesai tidak diulang.";
+            }
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException) { if (!closing) OperationStatus.Text = "Belum dapat melanjutkan. Data tetap tersimpan; coba lagi."; }
+        finally { if (!closing) { SetPreparing(false); request++; await RefreshAsync(); } }
     }
     private async void RetryClick(object sender, RoutedEventArgs e)
     {
@@ -377,10 +427,14 @@ public partial class MainWindow : Window
             var selected = scope;
             var work = Task.Run(() => store.RetryFailed(selected));
             inputWork = work;
-            await work;
+            var changed = await work;
             if (!closing)
-                engine.Start();
+            {
+                if (changed > 0) engine.Start(selected);
+                OperationStatus.Text = changed > 0 ? $"{changed:N0} domain dijadwalkan ulang mulai dari sumber yang perlu diperiksa. Moz yang mungkin ditagih tidak dikirim ulang." : "Tidak ada sumber gagal yang bisa diulang otomatis pada cakupan ini. Gunakan Lanjutkan untuk pekerjaan yang dijeda.";
+            }
         }
+        catch (Microsoft.Data.Sqlite.SqliteException) { if (!closing) OperationStatus.Text = "Penjadwalan ulang gagal. Data tetap tersimpan; coba lagi."; }
         finally { if (!closing) { SetPreparing(false); request++; await RefreshAsync(); } }
     }
     private async void ExportClick(object sender, RoutedEventArgs e)
@@ -401,7 +455,7 @@ public partial class MainWindow : Window
             inputWork = work;
             await work;
             if (!closing)
-                InputFeedback.Text = "Ekspor seluruh hasil sesuai filter selesai.";
+                OperationStatus.Text = InputFeedback.Text = "Ekspor seluruh hasil sesuai filter selesai.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException) { if (!closing) MessageBox.Show(this, "CSV belum dapat disimpan. Periksa folder tujuan.", "Ekspor"); }
         finally { if (!closing) { SetPreparing(false); await RefreshAsync(); } }
@@ -465,6 +519,7 @@ public partial class MainWindow : Window
     {
         timer.Stop();
         engine.Pause();
+        inputCancel.Cancel();
         if (inputWork is { } input)
         {
             try
@@ -474,7 +529,10 @@ public partial class MainWindow : Window
             catch { }
         }
         if (engine.Completion is { } task)
-            await task;
+        {
+            try { await task; }
+            catch (Exception) { /* Closing still releases resources after a worker/database failure. */ }
+        }
         if (refreshWork is { } refresh)
         {
             try
@@ -495,8 +553,23 @@ public partial class MainWindow : Window
         IsEnabled = false;
         await StopAsync();
         transport.Dispose();
+        inputCancel.Dispose();
         closedAfterStop = true;
         _ = Dispatcher.BeginInvoke(Close);
+    }
+    internal string? ScreenshotDirectory { get; set; }
+    private void CaptureSmoke(string name)
+    {
+        if (ScreenshotDirectory is null) return;
+        UpdateLayout();
+        if (ResultsGrid.ActualHeight < 100 || ResumeButton.ActualWidth < 100)
+            throw new InvalidOperationException("Resume workspace layout clipped");
+        var image = new System.Windows.Media.Imaging.RenderTargetBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        image.Render(this);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+        using var output = File.Create(Path.Combine(ScreenshotDirectory, name + ".png"));
+        encoder.Save(output);
     }
     internal void VerifySmoke()
     {
@@ -531,7 +604,21 @@ public partial class MainWindow : Window
         Render(new(store.Jobs(), store.Counts(null), null, events));
         if (events.Rows.Any(r => r.Stage == "queued") || !events.Rows.Any(r => r.Status == "registered") || ExportButton.IsEnabled)
             throw new InvalidOperationException("Timestamped event log failed");
-        // Only the empty workspace is captured; fixtures stay in this temporary database.
+        store.State(job, "paused");
+        ResultTabs.SelectedIndex = 0;
+        ConfigureColumns();
+        Render(new(store.Jobs(), store.Counts(null), store.Page(null, 0, new()), null));
+        if (!ResumeButton.IsEnabled || ResumeBanner.Visibility != Visibility.Visible || !ResumeTitle.Text.Contains("2,499") && !ResumeTitle.Text.Contains("2.499"))
+            throw new InvalidOperationException("Resume from stored work failed");
+        // Capture a separate populated resume workspace before the empty-state screenshot.
+        InputPanel.IsExpanded = false;
+        CaptureSmoke("resume");
+        var oldWidth = Width;
+        var oldHeight = Height;
+        Width = 1040; Height = 700;
+        CaptureSmoke("resume-compact");
+        Width = oldWidth; Height = oldHeight;
+        // Only synthetic fixtures in this temporary database are used in screenshots.
         scope = "empty";
         ResultTabs.SelectedIndex = 0;
         ConfigureColumns();

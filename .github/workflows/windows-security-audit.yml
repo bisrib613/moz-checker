@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release tag to inspect without executing the app'
+        description: 'Release tag for scanning and protected startup on a disposable runner'
         required: true
         default: 'v0.2.0'
       expected_sha256:

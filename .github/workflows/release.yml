@@ -5,21 +5,27 @@ on:
       version:
         description: 'Release tag matching the tested application version'
         required: true
-        default: 'v0.4.1'
+        default: 'v0.5.0'
       build_run_id:
         description: 'Successful Test and Windows desktop build run from a main push'
         required: true
         default: ''
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       actions: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

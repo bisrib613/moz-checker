@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -45,11 +46,12 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
                 return bootstrap;
             // A missing TLD in an older cache deserves a fresh official list, but
             // thousands of unsupported domains must not trigger thousands of downloads.
-            if (refreshMissing && bootstrap is not null && bootstrapDownloadAttempt is { } attempted && DateTimeOffset.UtcNow - attempted < TimeSpan.FromMinutes(15))
+            if ((refreshMissing || bootstrap is null) && bootstrapDownloadAttempt is { } attempted && DateTimeOffset.UtcNow - attempted < TimeSpan.FromMinutes(15))
             {
                 if (bootstrapRefreshFailure is not null)
                     throw new SourceException(bootstrapRefreshFailure);
-                return bootstrap;
+                if (bootstrap is not null)
+                    return bootstrap;
             }
             bootstrapDownloadAttempt = DateTimeOffset.UtcNow;
             try
@@ -134,7 +136,7 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
     public async Task AvailabilityAsync(Result result, bool force, CancellationToken ct)
     {
         result.Errors.Remove("availability");
-        if (!force && store.CacheGet<Result>("availability", result.Domain, 900) is { } cached)
+        if (!force && store.CacheGet<Result>("availability", result.Domain, 900) is { Status: "available" or "registered" or "redemption" or "pending_delete" } cached)
         {
             CopyAvailability(cached, result);
             return;
@@ -220,7 +222,14 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
             }
         }
     }
-    public static double? Metric(JsonNode? value, double max = 100) => value is JsonValue v && v.TryGetValue<double>(out var n) && double.IsFinite(n) && n >= 0 && n <= max ? n : null;
+    public static double? Metric(JsonNode? value, double max = 100)
+    {
+        if (value is not JsonValue v)
+            return null;
+        if (!v.TryGetValue<double>(out var n) && !(v.TryGetValue<string>(out var text) && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out n)))
+            return null;
+        return double.IsFinite(n) && n >= 0 && n <= max ? n : null;
+    }
     public static string VisibleText(string html)
     {
         var doc = new HtmlDocument();
@@ -273,8 +282,15 @@ public sealed class Providers(Store store, ApiKeys keys, Transport http) : IProv
                 var text = VisibleText(reply.Text);
                 result.Sampled++;
                 foreach (var keyword in settings.Keywords.Where(x => !string.IsNullOrWhiteSpace(x)))
-                    if (Regex.IsMatch(text, @"(?<!\w)" + Regex.Escape(keyword.Trim()) + @"(?!\w)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
-                        result.Matches.Add(new(keyword, snapshotUrl));
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        if (Regex.IsMatch(text, @"(?<!\w)" + Regex.Escape(keyword.Trim()) + @"(?!\w)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
+                            result.Matches.Add(new(keyword, snapshotUrl));
+                    }
+                    catch (RegexMatchTimeoutException) { failed = true; }
+                }
             }
             catch (SourceException) { failed = true; }
         }

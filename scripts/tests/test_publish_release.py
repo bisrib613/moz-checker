@@ -30,7 +30,7 @@ class PublicationGateTests(unittest.TestCase):
         self.payload = {'MozChecker.exe': b'native host', 'MozChecker.dll': b'managed code'}
         self.report['exeSha256'] = hashlib.sha256(self.payload['MozChecker.exe']).hexdigest()
         self.report['payloadFiles'] = [{'path': k, 'bytes': len(v), 'sha256': hashlib.sha256(v).hexdigest()} for k, v in self.payload.items()]
-        (self.root / 'smoke-report.json').write_text(json.dumps({'ui': 'WPF', 'status': 'passed', 'checks': ['IDN/PSL', 'eight columns', 'available-only results', 'registered log', 'search', 'reset', 'CSV button states']}))
+        (self.root / 'smoke-report.json').write_text(json.dumps({'ui': 'WPF', 'status': 'passed', 'checks': ['IDN/PSL', 'eight columns', 'available-only results', 'registered log', 'search', 'reset', 'CSV button states', 'resume workspace', 'checkpoint resume guidance', 'single full-list session', 'aggregate progress', 'queue/event separation', 'persistent timestamped log']}))
 
     def validate(self, payload=None):
         (self.root / 'report.json').write_text(json.dumps(self.report))
@@ -59,6 +59,13 @@ class PublicationGateTests(unittest.TestCase):
     def test_modified_dll_is_rejected_even_if_host_is_unchanged(self):
         with self.assertRaises(RuntimeError):
             self.validate(self.payload | {'MozChecker.dll': b'changed code'})
+
+    def test_missing_resume_smoke_cannot_be_published(self):
+        smoke = json.loads((self.root / 'smoke-report.json').read_text())
+        smoke['checks'].remove('resume workspace')
+        (self.root / 'smoke-report.json').write_text(json.dumps(smoke))
+        with self.assertRaises(RuntimeError):
+            self.validate()
 
     def test_untested_extra_file_is_rejected(self):
         with self.assertRaises(RuntimeError):

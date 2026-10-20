@@ -63,11 +63,13 @@ public partial class App : Application
                     var code = 0;
                     try
                     {
+                        var screenshot = e.Args.SkipWhile(x => x != "--screenshot").Skip(1).FirstOrDefault();
+                        window.ScreenshotDirectory = screenshot is null ? null : System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(screenshot));
                         window.VerifySmoke();
                         File.WriteAllText(System.IO.Path.Combine(directory, "smoke-report.json"), JsonData.Write(new
                         {
                             Ui = "WPF",
-                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states", "immediate CSV parsing", "large-list import preview", "single full-list session", "aggregate progress", "queue/event separation", "persistent timestamped log" },
+                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states", "immediate CSV parsing", "large-list import preview", "single full-list session", "aggregate progress", "queue/event separation", "persistent timestamped log", "resume workspace", "checkpoint resume guidance" },
                             Status = "passed"
                         }));
                         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -97,7 +99,7 @@ public partial class App : Application
                 }, DispatcherPriority.ApplicationIdle);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or ArgumentException or System.Text.Json.JsonException)
         {
             if (!smoke)
                 MessageBox.Show("Workspace belum dapat dibuka. Pastikan aplikasi lain ditutup dan folder data dapat diakses.\n\n" + ex.GetType().Name, "Moz Checker", MessageBoxButton.OK, MessageBoxImage.Error);

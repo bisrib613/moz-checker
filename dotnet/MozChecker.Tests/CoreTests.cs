@@ -126,7 +126,7 @@ public sealed class CoreTests : IDisposable
         var values = JsonNode.Parse("{\"zero\":0,\"negative\":-1,\"text\":\"0\",\"big\":101}")!;
         Assert.Equal(0d, Providers.Metric(values["zero"]));
         Assert.Null(Providers.Metric(values["negative"]));
-        Assert.Null(Providers.Metric(values["text"]));
+        Assert.Equal(0d, Providers.Metric(values["text"]));
         Assert.Null(Providers.Metric(values["missing"]));
         Assert.Null(Providers.Metric(values["big"]));
     }

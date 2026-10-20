@@ -1,14 +1,14 @@
-# Moz Checker — Windows desktop workspace (0.4.0)
+# Moz Checker — research workspace 0.5.0
 
-The user explicitly rejected the previous dark mint dashboard, slogan, rounded cards and sidebar. This direction replaces that design for the C# desktop. Legacy Qt/Python styling is not the source of truth for WPF.
+The user rejected both a decorative dark dashboard and the subsequent unstyled gray form. The current direction is a composed Windows research tool: restrained blue, clear hierarchy, dense tables, and generous enough control spacing.
 
-- Use the standard light Windows controls, Segoe UI 13, white data grid, gray toolbar and blue system selection. No hero text, metric cards, decorative branding or custom animation.
-- Top toolbar: import, input reset, start, pause, resume, retry and settings. Input collapses after starting; the table receives the available window area.
-- One imported list creates one examination, without a 1,000-domain split or a file-size cap. Large input shows an explicitly labeled 200-domain preview while retaining the entire parsed list for start.
-- Scope selector defaults to all examinations, including the previous version's split jobs. Progress is total/done/pending/actually active within the selected scope. Actual running job IDs and session-state counts are stated separately.
-- Four views: Available, Other results, Queue/in progress, Event log. Pending rows never masquerade as completed results or events.
-- Events are persisted in SQLite with sequence number, UTC timestamp rendered in local computer time, examination, domain, stage, status and message. Newest first. Older pages are anchored; Terbaru follows the live stream again. Old result timestamps are not fabricated into events during migration.
-- Main grids are virtualized and read 200 records per page. Every page shows its range and total. This is presentation paging, not a domain-processing limit. Search/filter/sort apply across the entire selected scope, and export streams all matching available results across all pages.
-- Counters are maintained in SQLite, and background workers read pending records in small cursor pages. Neither UI refresh nor engine startup deserializes a half-million-record result list.
-- Native focus rings, labeled controls, keyboard shortcuts and standard dialogs. The verified UI/UX Pro Max WPF guidance supports native keyboard navigation, proportional Grid layout and virtualization; it does not prescribe a marketing dashboard.
-- API settings/evidence use the same light native resources. Primary text #202020 and muted text #555555 have sufficient contrast against the white/light gray surfaces. Do not claim high-DPI/screen-reader certification from runner screenshots.
+- Canvas #F4F6F9, surface #FFFFFF, text #1D2939, secondary #526174, accent #2457A7, border #CBD3DE. Segoe UI 13; application name 21; resume message 16. A 4/8px spacing rhythm, 4/5px corner radii, no hero slogans, gradients, metric cards or decorative animations.
+- The workspace opens on existing research, not an empty input form. Show a blue-tinted resume strip with remaining domain count, preserved completion count and one clear action. Collapse new-list input when stored work exists.
+- New input, Resume and Retry are distinct actions: create a session, continue its checkpoint, or repeat eligible failed sources. Scope applies to the action; selected-session resume does not run unrelated queued work.
+- Keep existing split sessions intact and offer all-session totals. No domain/file cap or new splitting. A 200-domain input preview and 200-row table page are presentation only.
+- Header has compact brand, import/new-list/settings. Workspace has scope, progress, four tabs and a single search/filter/action toolbar. The data table receives remaining height.
+- Consistent buttons, quiet dividers, 34px rows, 40px column headers, bold domain text, subtle selection. Visible keyboard focus never changes geometry. Generator fields have visible labels. Settings/evidence share the same visual resources.
+- Persistent events are newest first, timestamped locally from UTC; waiting rows remain separate. History pages are anchored. No invented historical events.
+- Grid pagination/search/filter/sort/export cover the full selected scope. Virtualize rows and columns. Read work in bounded SQLite cursor pages; import/query/export/resume/retry operate off the UI thread.
+- WPF keyboard/Grid/virtualization recommendations were relevant. Generic catalog product styles returned irrelevant website/research-platform recommendations and were rejected; this tool's composition and palette are deliberate project-specific choices.
+- Verify native screenshots with synthetic resumed data at 1440×900 and 1040×700, plus the empty state. These checks are not a high-DPI/accessibility certification.

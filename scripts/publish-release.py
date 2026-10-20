@@ -75,7 +75,7 @@ def verify_security_report(root, package_root):
     profiles = report.get('firewallProfiles', [])
     if not profiles or not all(x.get('Enabled') in (True, 1) for x in profiles):
         raise RuntimeError('Startup containment was unavailable')
-    checks = {'IDN/PSL', 'eight columns', 'available-only results', 'registered log', 'search', 'reset', 'CSV button states'}
+    checks = {'IDN/PSL', 'eight columns', 'available-only results', 'registered log', 'search', 'reset', 'CSV button states', 'resume workspace', 'checkpoint resume guidance', 'single full-list session', 'aggregate progress', 'queue/event separation', 'persistent timestamped log'}
     if smoke.get('ui') != 'WPF' or smoke.get('status') != 'passed' or not checks.issubset(smoke.get('checks', [])):
         raise RuntimeError('Native WPF smoke checks missing')
     with zipfile.ZipFile(package_root / 'MozChecker-Windows-x64.zip') as archive:

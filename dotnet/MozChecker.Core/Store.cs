@@ -29,7 +29,7 @@ public sealed partial class Store : IDisposable
         Execute("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, created TEXT, state TEXT); CREATE TABLE IF NOT EXISTS results(job TEXT, domain TEXT, ordinal INTEGER, data TEXT, PRIMARY KEY(job, domain)); CREATE TABLE IF NOT EXISTS cache(source TEXT, domain TEXT, checked TEXT, data TEXT, PRIMARY KEY(source,domain)); CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT); CREATE TABLE IF NOT EXISTS quota(period TEXT PRIMARY KEY, used INTEGER NOT NULL);");
         InitializeWorkspace();
         // An interrupted job is never silently restarted on application launch.
-        Execute("UPDATE jobs SET state='paused' WHERE state IN ('running','queued')");
+        Execute("UPDATE jobs SET state='paused' WHERE state IN ('running','queued') OR (state='completed' AND EXISTS(SELECT 1 FROM results WHERE results.job=jobs.id AND json_extract(data,'$.stage')<>'done'))");
     }
     private SqliteCommand Command(string sql, params object[] args)
     {
@@ -172,7 +172,10 @@ public sealed partial class Store : IDisposable
         {
             using var cmd = Command("SELECT checked,data FROM cache WHERE source=$p0 AND domain=$p1", source, domain);
             using var reader = cmd.ExecuteReader();
-            return reader.Read() && JsonData.Fresh(reader.GetString(0), ttl) ? JsonData.Read<T>(reader.GetString(1)) : default;
+            if (!reader.Read() || !JsonData.Fresh(reader.GetString(0), ttl))
+                return default;
+            try { return JsonData.Read<T>(reader.GetString(1)); }
+            catch (JsonException) { return default; } // Cache is replaceable; job/results are not.
         }
     }
     public void CachePut<T>(string source, string domain, T value)
@@ -203,14 +206,48 @@ public sealed partial class Store : IDisposable
             return true;
         }
     }
-    public void RetryFailed(string? job)
+    public bool ReserveMozRow(string job, Result result, Settings settings)
+    {
+        lock (sync)
+        {
+            using var tx = db.BeginTransaction(deferred: false);
+            using var read = Command("SELECT data FROM results WHERE job=$p0 AND domain=$p1", job, result.Domain);
+            if (read.ExecuteScalar() is not string data)
+                throw new InvalidOperationException("Domain tidak tersimpan dalam pemeriksaan.");
+            var persisted = JsonData.Read<Result>(data);
+            if (persisted.MozState is "reserved" or "failed" or "uncertain" || persisted.MozAt.Length > 0)
+                throw new InvalidOperationException("Permintaan Moz sudah tercatat; tidak boleh dikirim ulang.");
+            if (Used(settings.Period) >= Math.Max(0, settings.MozBudget - settings.MozReserve))
+                return false;
+            Execute("INSERT INTO quota VALUES ($p0,1) ON CONFLICT(period) DO UPDATE SET used=used+1", settings.Period);
+            result.MozState = "reserved";
+            result.Stage = "moz";
+            Execute("UPDATE results SET data=$p0 WHERE job=$p1 AND domain=$p2", JsonData.Write(result), job, result.Domain);
+            AddEvent(job, result.Domain, "moz", "reserved", "Moz: kuota dan penanda permintaan disimpan dalam satu transaksi");
+            tx.Commit();
+            return true;
+        }
+    }
+    public void NoteFailure(string job, string exceptionType)
     {
         lock (sync)
         {
             using var tx = db.BeginTransaction();
-            Execute("UPDATE results SET data=json_set(data,'$.stage','queued') WHERE ($p0='' OR job=$p0) AND json_extract(data,'$.stage')='done' AND (json_extract(data,'$.history')='unchecked' OR json_extract(data,'$.status')='unknown' OR json_extract(data,'$.errors')<>'{}')", job ?? "");
+            AddEvent(job, "", "worker", "failed", $"Worker berhenti ({exceptionType}); hasil disimpan, gunakan Lanjutkan.");
+            tx.Commit();
+        }
+    }
+    public long RetryFailed(string? job)
+    {
+        lock (sync)
+        {
+            using var tx = db.BeginTransaction();
+            const string retryStage = "CASE WHEN json_extract(data,'$.status')='unknown' OR json_extract(data,'$.errors.availability') IS NOT NULL THEN 'queued' WHEN json_extract(data,'$.errors.opr') IS NOT NULL THEN 'opr_queued' WHEN json_extract(data,'$.history')='unchecked' OR json_extract(data,'$.errors.history') IS NOT NULL THEN 'history_queued' ELSE 'moz_queued' END";
+            Execute("UPDATE results SET data=json_set(data,'$.stage'," + retryStage + ") WHERE ($p0='' OR job=$p0) AND json_extract(data,'$.stage')='done' AND (json_extract(data,'$.status')='unknown' OR json_extract(data,'$.errors.availability') IS NOT NULL OR (json_extract(data,'$.status')='available' AND (json_extract(data,'$.errors.opr') IS NOT NULL OR json_extract(data,'$.history')='unchecked' OR json_extract(data,'$.errors.history') IS NOT NULL OR (coalesce(json_extract(data,'$.moz_at'),'')='' AND json_extract(data,'$.history') IN ('valid','no_history') AND json_extract(data,'$.moz_state') IN ('no_key','quota_reserved','availability_failed','not_available')))))", job ?? "");
+            var changed = Convert.ToInt64(Scalar("SELECT changes()"));
             Execute("UPDATE jobs SET state='queued' WHERE ($p0='' OR id=$p0) AND EXISTS(SELECT 1 FROM results WHERE job=jobs.id AND json_extract(data,'$.stage')<>'done')", job ?? "");
             tx.Commit();
+            return changed;
         }
     }
     public void Dispose()

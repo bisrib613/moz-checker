@@ -79,6 +79,7 @@ public sealed record Job(string Id, string Created, string State)
 }
 public sealed class Settings
 {
+    public int AvailabilityWorkers { get; set; } = 8;
     public int MozBudget { get; set; } = 50;
     public int MozReserve { get; set; } = 5;
     public string MozPeriod { get; set; } = "";
@@ -92,9 +93,11 @@ public sealed class Settings
     [JsonIgnore] public string Period => string.IsNullOrWhiteSpace(MozPeriod) ? DateTimeOffset.UtcNow.ToString("yyyy-MM") : MozPeriod;
     public void Validate()
     {
+        if (AvailabilityWorkers is < 1 or > 32)
+            throw new ArgumentException("Concurrency RDAP/DNS harus antara 1 dan 32.");
         if (MozBudget < 0 || MozReserve < 0 || MozReserve > MozBudget || Samples is < 1 or > 20 || OprMin is < 0 or > 10 || !double.IsFinite(OprMin))
             throw new ArgumentException("Anggaran/cadangan tidak valid; sampel 1–20 dan OPR 0–10.");
-        if (MozPeriod.Length > 40 || Keywords.Count > 200 || Keywords.Any(x => x.Length > 100))
+        if (MozPeriod is null || MozPeriod.Length > 40 || Keywords is null || Keywords.Count > 200 || Keywords.Any(x => x is null || x.Length > 100))
             throw new ArgumentException("Periode atau daftar kata kunci terlalu panjang.");
     }
 }
@@ -301,10 +304,22 @@ public static class CsvExport
     }
     public static void Save(string path, IEnumerable<Result> results)
     {
-        using var writer = new StreamWriter(path, false, new UTF8Encoding(true));
-        var properties = typeof(Result).GetProperties().Where(x => x.Name is not (nameof(Result.Readiness) or nameof(Result.WorkState) or nameof(Result.StatusText))).ToArray();
-        writer.WriteLine(string.Join(',', properties.Select(x => Cell(JsonNamingPolicy.SnakeCaseLower.ConvertName(x.Name)))) + ",authority_sources");
-        foreach (var r in results.Where(x => x.Status == "available"))
-            writer.WriteLine(string.Join(',', properties.Select(p => Cell(p.GetValue(r) is var v && v is not null ? v is string s ? s : JsonData.Write(v) : ""))) + ",\"OPR; Moz DA; Moz PA; Moz Spam Score\"");
+        var target = Path.GetFullPath(path);
+        var temporary = Path.Combine(Path.GetDirectoryName(target)!, ".moz-checker-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            using (var writer = new StreamWriter(temporary, false, new UTF8Encoding(true)))
+            {
+                var properties = typeof(Result).GetProperties().Where(x => x.Name is not (nameof(Result.Readiness) or nameof(Result.WorkState) or nameof(Result.StatusText))).ToArray();
+                writer.WriteLine(string.Join(',', properties.Select(x => Cell(JsonNamingPolicy.SnakeCaseLower.ConvertName(x.Name)))) + ",authority_sources");
+                foreach (var r in results.Where(x => x.Status == "available"))
+                    writer.WriteLine(string.Join(',', properties.Select(p => Cell(p.GetValue(r) is var v && v is not null ? v is string text ? text : JsonData.Write(v) : ""))) + ",\"OPR; Moz DA; Moz PA; Moz Spam Score\"");
+            }
+            File.Move(temporary, target, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 }

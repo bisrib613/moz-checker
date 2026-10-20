@@ -102,6 +102,9 @@ internal sealed class SettingsWindow : Window
         var period = Forms.Text(settings.MozPeriod);
         var samples = Forms.Text(settings.Samples.ToString());
         var min = Forms.Text(settings.OprMin.ToString(CultureInfo.InvariantCulture));
+        var workers = Forms.Text(settings.AvailabilityWorkers.ToString());
+        Forms.Field(rulesPanel, "Concurrency RDAP / DNS (1–32)", workers);
+        rulesPanel.Children.Add(Forms.Hint("Default 8 domain paralel. Batas tiap server RDAP tetap berlaku; Wayback dan Moz tetap serial sesuai interval provider."));
         Forms.Field(rulesPanel, "Anggaran Moz lokal (rows per periode)", budget);
         Forms.Field(rulesPanel, "Cadangan rows", reserve);
         Forms.Field(rulesPanel, "Periode khusus (kosong = bulan UTC berjalan)", period);
@@ -127,8 +130,10 @@ internal sealed class SettingsWindow : Window
         {
             try
             {
-                var next = new Settings { MozBudget = Forms.Int(budget), MozReserve = Forms.Int(reserve), MozPeriod = period.Text.Trim(), Samples = Forms.Int(samples), OprMin = Forms.Number(min), EmptyValid = empty.IsChecked == true, Keywords = keywords.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList() };
+                var next = new Settings { AvailabilityWorkers = Forms.Int(workers), MozBudget = Forms.Int(budget), MozReserve = Forms.Int(reserve), MozPeriod = period.Text.Trim(), Samples = Forms.Int(samples), OprMin = Forms.Number(min), EmptyValid = empty.IsChecked == true, Keywords = keywords.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList() };
                 next.Validate();
+                if (new[] { opr.Password, mozId.Password, mozSecret.Password }.Any(value => System.Text.Encoding.Unicode.GetByteCount(value.Trim()) > 2560))
+                    throw new ArgumentException("Kunci terlalu panjang untuk Credential Manager; belum ada kunci diubah.");
                 CredentialVault.Save("opr_key", opr.Password.Trim());
                 CredentialVault.Save("moz_id", mozId.Password.Trim());
                 CredentialVault.Save("moz_secret", mozSecret.Password.Trim());
@@ -137,6 +142,7 @@ internal sealed class SettingsWindow : Window
             }
             catch (ArgumentException ex) { error.Text = ex.Message; }
             catch (System.ComponentModel.Win32Exception) { error.Text = "Penyimpanan Credential Manager gagal. Periksa kembali kunci dan coba simpan lagi."; }
+            catch (Microsoft.Data.Sqlite.SqliteException) { error.Text = "Aturan belum dapat disimpan. Kunci mungkin sudah berubah; periksa kembali sebelum mencoba lagi."; }
         }, true);
         save.IsEnabled = loaded;
         actions.Children.Add(save);
@@ -158,7 +164,7 @@ internal sealed class FilterWindow : Window
     public FilterWindow(FilterValues values)
     {
         Values = values;
-        Title = "Filter domain available";
+        Title = "Filter hasil pemeriksaan";
         Width = 470;
         Height = 650;
         MinHeight = 400;

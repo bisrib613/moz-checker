@@ -58,13 +58,17 @@ public sealed record WebReply(int Status, string ContentType, string Text)
 public sealed class Transport : IDisposable
 {
     private readonly HttpClient client;
-    public Transport(HttpMessageHandler? handler = null)
+    private readonly TimeSpan requestTimeout;
+    public Transport(HttpMessageHandler? handler = null, TimeSpan? timeout = null)
     {
+        requestTimeout = timeout ?? TimeSpan.FromSeconds(25);
+        if (requestTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(timeout));
         client = new(handler ?? new HttpClientHandler { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.None })
         {
-            Timeout = TimeSpan.FromSeconds(25)
+            Timeout = Timeout.InfiniteTimeSpan
         };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("MozChecker/0.3 (Windows desktop research)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MozChecker/0.5 (Windows desktop research)");
         client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Encoding", "identity");
     }
     public async Task<WebReply> SendAsync(Func<HttpRequestMessage> request, RateGate? gate, CancellationToken ct, int attempts = 3, int maxBytes = 2_000_000)
@@ -76,10 +80,13 @@ public sealed class Transport : IDisposable
                 await gate.WaitAsync(ct);
             try
             {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                deadline.CancelAfter(requestTimeout);
+                var requestToken = deadline.Token;
                 using var message = request();
                 if (message.RequestUri?.Scheme != "https")
                     throw new SourceException("Hanya koneksi HTTPS yang didukung");
-                using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, requestToken);
                 if ((int)response.StatusCode is 429 or 502 or 503 or 504)
                 {
                     var retry = response.Headers.RetryAfter;
@@ -94,11 +101,11 @@ public sealed class Transport : IDisposable
                         await Task.Delay(delay, ct);
                     continue;
                 }
-                await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                await using var stream = await response.Content.ReadAsStreamAsync(requestToken);
                 using var buffer = new MemoryStream();
                 var chunk = new byte[8192];
                 int count;
-                while ((count = await stream.ReadAsync(chunk, ct)) > 0)
+                while ((count = await stream.ReadAsync(chunk, requestToken)) > 0)
                 {
                     if (buffer.Length + count > maxBytes)
                         throw new SourceException("Respons terlalu besar; pemeriksaan tidak lengkap");
@@ -115,6 +122,7 @@ public sealed class Transport : IDisposable
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested) { if (attempt == attempts - 1) throw new SourceException("Koneksi timeout"); }
             catch (HttpRequestException) { if (attempt == attempts - 1) throw new SourceException("Koneksi sumber gagal"); }
+            catch (IOException) { if (attempt == attempts - 1) throw new SourceException("Pembacaan respons sumber terputus"); }
             if (attempt + 1 < attempts)
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct);
         }

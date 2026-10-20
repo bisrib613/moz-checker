@@ -13,7 +13,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
     public bool Running => Completion is { IsCompleted: false };
     public string Failure { get; private set; } = "";
     public event Action? Changed;
-    public void Start()
+    public void Start(string? selectedJob = null)
     {
         lock (lifecycle)
         {
@@ -22,7 +22,8 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
             stop?.Dispose();
             stop = new();
             Failure = "";
-            Completion = Task.Run(() => RunAsync(stop.Token));
+            var token = stop.Token;
+            Completion = Task.Run(() => RunAsync(selectedJob, token));
         }
     }
     public void Pause()
@@ -35,13 +36,13 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
         store.Save(job, result);
         Changed?.Invoke();
     }
-    private async Task RunAsync(CancellationToken ct)
+    private async Task RunAsync(string? selectedJob, CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                var job = store.Jobs().FirstOrDefault(x => x.State is "queued" or "running");
+                var job = store.Jobs().FirstOrDefault(x => (selectedJob is null || x.Id == selectedJob) && x.State is "queued" or "running");
                 if (job is null)
                     break;
                 store.State(job.Id, "running");
@@ -53,7 +54,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                     store.State(job.Id, "completed");
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { store.State(job.Id, "paused"); break; }
-                catch (Exception ex) { Failure = $"Worker berhenti ({ex.GetType().Name}); pemeriksaan dijeda."; store.State(job.Id, "paused"); break; }
+                catch (Exception ex) { Failure = $"Worker berhenti ({ex.GetType().Name}); pemeriksaan dijeda."; store.State(job.Id, "paused"); store.NoteFailure(job.Id, ex.GetType().Name); break; }
                 Changed?.Invoke();
             }
         }
@@ -63,8 +64,8 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
     {
         var settings = store.GetSettings();
         var availability = Channel.CreateBounded<Result>(new BoundedChannelOptions(1000) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
-        var history = Channel.CreateBounded<Result>(new BoundedChannelOptions(1000) { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
-        var moz = Channel.CreateBounded<Result>(new BoundedChannelOptions(1000) { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
+        var history = Channel.CreateBounded<Result>(new BoundedChannelOptions(1000) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
+        var moz = Channel.CreateBounded<Result>(new BoundedChannelOptions(1000) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
         // One linked cancellation scope prevents a failed lane leaving other lanes blocked on a full channel.
         using var lanes = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = lanes.Token;
@@ -80,13 +81,29 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
         {
             try
             {
-                await Parallel.ForEachAsync(store.PendingResults(job), new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = token }, async (r, t) =>
+                await Parallel.ForEachAsync(store.PendingResults(job), new ParallelOptions { MaxDegreeOfParallelism = settings.AvailabilityWorkers, CancellationToken = token }, async (r, t) =>
                 {
+                    // Resume the persisted lane; completed free-source work is not replayed.
+                    if (r.Stage is "moz" or "moz_queued")
+                    {
+                        await moz.Writer.WriteAsync(r, t);
+                        return;
+                    }
+                    if (r.Stage is "history" or "history_queued")
+                    {
+                        await history.Writer.WriteAsync(r, t);
+                        return;
+                    }
+                    if (r.Stage is "opr" or "opr_queued")
+                    {
+                        await availability.Writer.WriteAsync(r, t);
+                        return;
+                    }
                     r.Stage = "availability";
                     Emit(job, r);
                     try
                     {
-                        await providers.AvailabilityAsync(r, false, t);
+                        await providers.AvailabilityAsync(r, r.Errors.ContainsKey("availability"), t);
                     }
                     catch (SourceException ex) { r.Status = "unknown"; r.Errors["availability"] = ex.Message; }
                     Emit(job, r);
@@ -129,9 +146,18 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                         Emit(job, r);
                         if (r.Opr is null || r.Opr >= settings.OprMin)
                         {
-                            r.Stage = "history_queued";
-                            Emit(job, r);
-                            await history.Writer.WriteAsync(r, token);
+                            if (r.History is "valid" or "no_history" && r.HistoryAt.Length > 0 && !r.Errors.ContainsKey("history"))
+                            {
+                                r.Stage = "moz_queued";
+                                Emit(job, r);
+                                await moz.Writer.WriteAsync(r, token);
+                            }
+                            else
+                            {
+                                r.Stage = "history_queued";
+                                Emit(job, r);
+                                await history.Writer.WriteAsync(r, token);
+                            }
                         }
                         else
                         {
@@ -181,6 +207,23 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
     private async Task CheckMozAsync(string job, Result r, Settings settings, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        if (r.MozAt.Length > 0)
+        {
+            r.Stage = "done";
+            Emit(job, r);
+            return;
+        }
+        if (r.History == "no_history" && !settings.EmptyValid)
+        {
+            r.History = "unchecked";
+            r.Errors["history"] = "Tanpa riwayat tidak diizinkan oleh pengaturan saat ini";
+        }
+        if (r.History is not ("valid" or "no_history"))
+        {
+            r.Stage = "done";
+            Emit(job, r);
+            return;
+        }
         if (r.MozState == "reserved")
         {
             r.MozState = "uncertain";
@@ -205,13 +248,11 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                 }
                 if (r.Status != "available" || !JsonData.Fresh(r.AvailabilityAt, 900))
                     r.MozState = "not_available";
-                else if (!store.ReserveRow(settings.Period, settings.MozBudget, settings.MozReserve))
+                else if (!store.ReserveMozRow(job, r, settings))
                     r.MozState = "quota_reserved";
                 else
                 {
-                    r.MozState = "reserved";
-                    r.Stage = "moz";
-                    Emit(job, r);
+                    Changed?.Invoke();
                     await providers.MozAsync(r, ct);
                     r.Errors.Remove("moz");
                 }
