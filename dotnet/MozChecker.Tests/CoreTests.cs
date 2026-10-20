@@ -344,13 +344,23 @@ public sealed class CoreTests : IDisposable
         var job = store.NewJob(Enumerable.Range(0, 2501).Select(i => $"beyond{i}.com"));
         var engine = new Engine(store, new(), new FakeProviders());
         engine.Start();
-        await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(180));
-        Assert.Single(store.Jobs());
-        Assert.Equal("completed", store.Jobs().Single().State);
-        Assert.Equal(2501, store.Counts(job).Done);
-        Assert.Equal(0, store.Counts(job).Pending);
-        Assert.Equal(2501, store.Page(job, 0, new()).Total);
-        Assert.Empty(store.PendingResults(job));
+        try
+        {
+            // Windows runners can spend several minutes flushing the per-stage WAL transactions.
+            // This verifies completion beyond 1,000 domains, not a disk throughput target.
+            await engine.Completion!.WaitAsync(TimeSpan.FromMinutes(10));
+            Assert.Single(store.Jobs());
+            Assert.Equal("completed", store.Jobs().Single().State);
+            Assert.Equal(2501, store.Counts(job).Done);
+            Assert.Equal(0, store.Counts(job).Pending);
+            Assert.Equal(2501, store.Page(job, 0, new()).Total);
+            Assert.Empty(store.PendingResults(job));
+        }
+        finally
+        {
+            engine.Pause();
+            await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(30));
+        }
     }
     [Fact]
     public async Task ThousandDomainBoundedPipelineCompletesWithoutDeadlock()
