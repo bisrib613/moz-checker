@@ -32,6 +32,11 @@ QProgressBar::chunk { background: #288465; }
 QLabel#title { font-size: 25px; font-weight: 700; }
 QLabel#subtle { color: #9aabc0; }
 QCheckBox { spacing: 8px; }
+QTabWidget::pane { border: 1px solid #344154; background: #10151d; }
+QWidget#resultsPage { background: #10151d; }
+QTabBar::tab { background: #1a2330; color: #e3e8ef; border: 1px solid #344154; padding: 8px 16px; }
+QTabBar::tab:selected { background: #263448; border-bottom: 2px solid #389c76; }
+QTabBar::tab:hover { background: #354863; }
 '''
 
 
@@ -248,6 +253,7 @@ class Window(QMainWindow):
         self.table.itemSelectionChanged.connect(self.show_evidence)
         self.tabs = QTabWidget()
         self.results_page = QWidget()
+        self.results_page.setObjectName('resultsPage')
         main_results = QVBoxLayout(self.results_page)
         main_results.setContentsMargins(0, 0, 0, 0)
         self.empty_results = QLabel('Belum ada domain available. Lihat Log pemeriksaan untuk hasil lainnya.')
