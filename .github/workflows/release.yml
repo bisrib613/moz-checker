@@ -5,7 +5,7 @@ on:
       version:
         description: 'Release tag matching the tested application version'
         required: true
-        default: 'v0.3.0'
+        default: 'v0.3.1'
       build_run_id:
         description: 'Successful Test and Windows desktop build run from a main push'
         required: true

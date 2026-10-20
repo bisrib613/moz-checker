@@ -9,6 +9,13 @@
       "package_sha256": "abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f",
       "decision": "User requested completion and publication of the separately implemented C#/WPF preview. Limited protected runner checks passed. Earlier Python endpoint detection remains unresolved; no antivirus-clearance or false-positive claim.",
       "draft_release_id": 418273912
+    },
+    "v0.3.1": {
+      "build_run_id": "39413042597",
+      "source_commit": "610a22667ba523c53abe35f03184e4f1da051d17",
+      "package_sha256": "918482ad6d1784ea02278e32860eed1090510dd666a5633f8b98116cac042e1a",
+      "draft_release_id": 418309532,
+      "decision": "Requested immediate CSV parsing and large-list import fix. 45 core tests passed on Windows/Linux; protected native smoke includes immediate CSV parsing and large-list preview. Publish this exact preview after uploaded payload verification; previous Python investigation remains open."
     }
   }
 }
