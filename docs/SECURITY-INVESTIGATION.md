@@ -40,3 +40,7 @@ The runner uses Windows Server, cloud reporting remains off, no real API keys we
 ## Preview publication decision
 
 The explicit request to finish publishing authorizes v0.3.0 from build `39400588371`, source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`, ZIP SHA-256 `abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f`. The publisher independently fetches the successful CI artifacts, verifies the pinned source/hash, active Defender evidence, WPF smoke and every packaged file. Release notes disclose that the old detection is unresolved and that runner checks are limited. The Python warning and default publication block remain; nothing is renamed, restored from quarantine or exempted from antivirus.
+
+## Publication outcome
+
+[v0.3.0 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.3.0) was published with the unchanged reviewed ZIP, checksum manifest and `SECURITY-VALIDATION.json`. Integration permissions prevented release metadata creation, so the owner created the pinned draft; [workflow 39408332689](https://github.com/bisrib613/moz-checker/actions/runs/39408332689) verified and uploaded the assets. The downloaded draft assets, source, release notes and GitHub digests were independently checked before owner publication. Release ID: `418273912`; ZIP SHA-256 remains `abfb47607832ad174eb6b52ce2d7e8a014b8d08b46d024b3a078a247d3c6526f`. The Python investigation and default block for unreviewed releases remain open.
