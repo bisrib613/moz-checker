@@ -1,0 +1,27 @@
+Moz Checker WPF package - third-party components
+
+DnsClient.NET 1.8.0, copyright MichaCo and contributors, Apache-2.0.
+https://github.com/MichaCo/DnsClient.NET
+
+Html Agility Pack 1.13.1, copyright ZZZ Projects and contributors, MIT.
+https://github.com/zzzprojects/html-agility-pack
+
+Microsoft.Data.Sqlite / Microsoft.Data.Sqlite.Core 10.0.13,
+copyright .NET Foundation and contributors, MIT.
+https://github.com/dotnet/efcore
+
+SQLitePCLRaw (core/provider/batteries/native bundle) 2.1.13,
+copyright Eric Sink and contributors, Apache-2.0.
+https://github.com/ericsink/SQLitePCL.raw
+The embedded SQLite library is in the public domain: https://sqlite.org/copyright.html
+
+ICANN Public Suffix List, Mozilla contributors, MPL-2.0.
+https://publicsuffix.org/list/
+The bundled snapshot, including license header, is available in source form:
+https://github.com/bisrib613/moz-checker/blob/main/dotnet/MozChecker.Core/Data/public_suffix_list.dat
+The private-domains section was omitted to retain registry-level validation.
+
+Full license texts are included alongside this notice. Dependency versions and
+content hashes are pinned in the repository's dotnet/*/packages.lock.json files.
+The Microsoft .NET Desktop Runtime is installed separately and is not redistributed
+in this framework-dependent package.

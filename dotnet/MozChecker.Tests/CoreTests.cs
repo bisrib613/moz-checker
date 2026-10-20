@@ -147,6 +147,21 @@ public sealed class CoreTests : IDisposable
         Assert.Equal(1, handler.Calls);
     }
     [Fact]
+    public async Task BilledThrottleDefersNextDomainWithoutSendingAgain()
+    {
+        var handler = new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromHours(1));
+            return response;
+        });
+        using var http = new Transport(handler);
+        var gate = new RateGate(TimeSpan.Zero);
+        await Assert.ThrowsAsync<SourceException>(() => http.SendAsync(() => new(HttpMethod.Post, "https://lsapi.seomoz.com/v2/url_metrics"), gate, CancellationToken.None, attempts: 1));
+        await Assert.ThrowsAsync<SourceException>(() => http.SendAsync(() => new(HttpMethod.Post, "https://lsapi.seomoz.com/v2/url_metrics"), gate, CancellationToken.None, attempts: 1));
+        Assert.Equal(1, handler.Calls);
+    }
+    [Fact]
     public async Task OversizedReplyFailsClosed()
     {
         var handler = new StubHandler(_ => new(HttpStatusCode.OK) { Content = new StringContent(new string('x', 1000)) });

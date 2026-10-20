@@ -17,7 +17,7 @@ The build is **framework-dependent**: install Microsoft's **.NET 10 Desktop Runt
 
 ## Validation and remaining limits
 
-Core tests exercise normalization, PSL exceptions, Python-compatible JSON/SQLite, backup, availability evidence, stale availability refresh before Moz, source failure isolation, no duplicate billing, quota races, cancellation/resume, CSV, and a 1,000-domain pipeline. Native WPF smoke uses a fresh temporary profile with simulated rows, checks the available/log separation, search/reset and export state, and renders the empty workspace at normal and minimum dimensions. Fixtures are never inserted into real user data.
+Core tests exercise normalization, PSL exceptions, Python-compatible JSON/SQLite, backup, availability evidence, stale availability refresh before Moz, source failure isolation, no duplicate billing, quota races, cancellation/resume, CSV, and a 1,000-domain pipeline. Native WPF smoke uses a fresh temporary profile with simulated rows, checks the available/log separation, search/reset and export state, and requests normal/minimum window sizes. The runner display can constrain the actual window bounds; its captured render is 1040×768, so a full 1440×900 display and high-DPI layout remain manual checks. Fixtures are never inserted into real user data.
 
 The Windows build is scanned before startup. Real-time and behavior protection must be active, applicable runner exclusions removed only on the disposable GitHub VM, firewall profiles enabled, and outbound traffic blocked for the smoke executable. Scan/startup evidence is retained. These checks do **not** replicate the user's Windows 11 cloud ML behavior, establish a false positive, or resolve the previous detection. `release-security.json` remains blocked and publication must fail.
 
@@ -37,3 +37,7 @@ dotnet build dotnet/MozChecker.Desktop --no-restore --configuration Release
 Windows package: `pwsh ./scripts/build-windows.ps1`. Native UI cannot run on Linux; run the protected validation workflow on a disposable Windows runner. SDK/package cache paths in cloud setup use writable workspace directories.
 
 The embedded ICANN Public Suffix List comes from the same MPL-2.0 snapshot bundled by the existing tldextract dependency; see `dotnet/MozChecker.Core/Data/NOTICE.txt`. Package lock files pin transitive dependencies. NuGet security audit remains enabled; known vulnerable dependencies are not suppressed.
+
+Native WPF empty workspace captured from the protected Windows smoke run (no real domain data):
+
+![Native WPF workspace](desktop-wpf.png)

@@ -1,3 +1,7 @@
+# Current C# / WPF validation
+
+The current 0.3.0 development desktop uses C#/.NET 10; see [migration validation](DOTNET-MIGRATION.md). The Python validation below describes the older 0.2.0 implementation. Native WPF builds and core tests are verified in the current CI workflow; security review and publication hold remain separate.
+
 # Status validasi
 
 Dibangun dari PRD pengguna pada 20 Oktober 2026. Platform cloud: Python 3.12, Linux tanpa display; target produk Windows 10/11 x64.

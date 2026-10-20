@@ -8,14 +8,35 @@ public sealed class RateGate(TimeSpan interval)
 {
     private readonly SemaphoreSlim mutex = new(1, 1);
     private long next;
+    private long penaltyUntil;
+    public void Defer(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+            return;
+        var proposed = Environment.TickCount64 + (long)Math.Min(duration.TotalMilliseconds, TimeSpan.FromDays(365).TotalMilliseconds);
+        long observed;
+        do
+        {
+            observed = Interlocked.Read(ref penaltyUntil);
+            if (observed >= proposed)
+                return;
+        }
+        while (Interlocked.CompareExchange(ref penaltyUntil, proposed, observed) != observed);
+    }
     public async Task WaitAsync(CancellationToken ct)
     {
         await mutex.WaitAsync(ct);
         try
         {
-            var delay = next - Environment.TickCount64;
-            if (delay > 0)
+            while (true)
+            {
+                var delay = Math.Max(next, Interlocked.Read(ref penaltyUntil)) - Environment.TickCount64;
+                if (delay <= 0)
+                    break;
+                if (delay > 120_000)
+                    throw new SourceException("Retry-After panjang; sumber ditunda, coba ulang nanti");
                 await Task.Delay(TimeSpan.FromMilliseconds(delay), ct);
+            }
             next = Environment.TickCount64 + (long)interval.TotalMilliseconds;
         }
         finally { mutex.Release(); }
@@ -61,11 +82,12 @@ public sealed class Transport : IDisposable
                 using var response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
                 if ((int)response.StatusCode is 429 or 502 or 503 or 504)
                 {
-                    // Billed requests are NEVER retried, including ambiguous throttling/errors.
-                    if (attempts == 1)
-                        throw new SourceException($"HTTP {(int)response.StatusCode}; permintaan berpotensi terhitung, tidak diulang");
                     var retry = response.Headers.RetryAfter;
                     var delay = retry?.Delta ?? (retry?.Date - DateTimeOffset.UtcNow) ?? TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                    gate?.Defer(delay);
+                    // Do not retry a billed request. The shared gate also delays the NEXT domain.
+                    if (attempts == 1)
+                        throw new SourceException($"HTTP {(int)response.StatusCode}; permintaan berpotensi terhitung, tidak diulang");
                     if (delay > TimeSpan.FromSeconds(120))
                         throw new SourceException("Retry-After panjang; coba ulang nanti");
                     if (delay > TimeSpan.Zero)
