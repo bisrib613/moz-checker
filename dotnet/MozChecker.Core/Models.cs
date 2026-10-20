@@ -71,7 +71,11 @@ public sealed record HistoryMatch(string Keyword, string Snapshot);
 public sealed record ImportResult(List<string> Domains, int Duplicates, List<string> Invalid);
 public sealed record Job(string Id, string Created, string State)
 {
-    public override string ToString() => $"{Created[..Math.Min(16, Created.Length)].Replace('T', ' ')} UTC · {Id[..8]} · {State}";
+    public long Total
+    {
+        get; init;
+    }
+    public override string ToString() => $"{Created[..Math.Min(16, Created.Length)].Replace('T', ' ')} UTC · {Id[..8]} · {Total:N0} domain · {State switch { "queued" => "menunggu", "running" => "berjalan", "paused" => "dijeda", "completed" => "selesai", _ => State }}";
 }
 public sealed class Settings
 {

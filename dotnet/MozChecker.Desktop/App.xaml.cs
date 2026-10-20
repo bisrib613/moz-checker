@@ -29,7 +29,7 @@ public partial class App : Application
                 throw new IOException("Tutup aplikasi Python lama sebelum membuka versi .NET; jika sudah ditutup, periksa sisa desktop.lock.");
             if (!smoke)
             {
-                loading = new Window { Title = "Moz Checker", Width = 460, Height = 130, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = new System.Windows.Controls.TextBlock { Text = "Membuka data lokal dan memperbarui indeks…", Margin = new Thickness(24), VerticalAlignment = VerticalAlignment.Center } };
+                loading = new Window { Title = "Moz Checker", Width = 460, Height = 130, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = new System.Windows.Controls.TextBlock { Text = "Membuka dan menyiapkan data lokal…", Margin = new Thickness(24), VerticalAlignment = VerticalAlignment.Center } };
                 loading.Closed += (_, _) => loadingClosed = true;
                 loading.Show();
             }

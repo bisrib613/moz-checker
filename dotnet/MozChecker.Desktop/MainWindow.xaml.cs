@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         smokeMode = smoke;
         engine = NewEngine(keys);
         InitializeComponent();
+        ResultTabs.SelectedIndex = 0;
         ConfigureColumns();
         timer.Tick += async (_, _) => await RefreshAsync();
         if (!smoke)
@@ -501,7 +502,7 @@ public partial class MainWindow : Window
     {
         timer.Stop();
         if (Domains.Normalize("https://www.bücher.de/path") != "xn--bcher-kva.de" || ResultsGrid.Columns.Count != 8)
-            throw new InvalidOperationException("Empty workspace failed");
+            throw new InvalidOperationException($"Empty workspace failed: columns={ResultsGrid.Columns.Count}");
         ApplyImport(Domains.Parse("score;Domain Name\n90;https://www.google.com/path\n80;GOOGLE.com\n70;co.id"));
         if (preparedImport?.Domains.Single() != "google.com" || !InputFeedback.Text.Contains("1 duplikat"))
             throw new InvalidOperationException("Immediate import failed");

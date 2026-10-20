@@ -108,11 +108,14 @@ public sealed partial class Store : IDisposable
     {
         lock (sync)
         {
-            using var cmd = Command("SELECT id,created,state FROM jobs ORDER BY created");
+            using var cmd = Command("SELECT jobs.id,jobs.created,jobs.state,coalesce(job_stats.total,0) FROM jobs LEFT JOIN job_stats ON job_stats.job=jobs.id ORDER BY jobs.created");
             using var reader = cmd.ExecuteReader();
             var jobs = new List<Job>();
             while (reader.Read())
-                jobs.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+                jobs.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2))
+                {
+                    Total = reader.GetInt64(3)
+                });
             return jobs;
         }
     }
