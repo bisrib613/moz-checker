@@ -1,0 +1,190 @@
+{
+  "defender_report": {
+    "status": "protected_startup_completed_no_detections",
+    "appExecuted": true,
+    "startedAtUtc": "2026-10-20T14:38:40.2106172Z",
+    "payloadFiles": [
+      {
+        "path": "DnsClient.dll",
+        "sha256": "fcf2d07f01bb34f6e8ea61da6d281d1979b5d3c1485bcc5b2b350ec8c59cc2f0",
+        "bytes": 157184
+      },
+      {
+        "path": "e_sqlite3.dll",
+        "sha256": "b7385d722c83fb52142a00477a726723745916d22a555711ee89834c1111fb2e",
+        "bytes": 1978880
+      },
+      {
+        "path": "HtmlAgilityPack.dll",
+        "sha256": "0192aac36f5ee31e09946ec98fdc63a371743b685d25094050217a3b38754c2b",
+        "bytes": 170496
+      },
+      {
+        "path": "licenses\\DnsClient-LICENSE.txt",
+        "sha256": "e03ba41d7fab20700769fe4118bab50d800cb74f990353a05d2f5fff1c228363",
+        "bytes": 11558
+      },
+      {
+        "path": "licenses\\HtmlAgilityPack-LICENSE.txt",
+        "sha256": "a072e0090690ac786e72240b211b360125aff54b4181acc7c8083e899556835e",
+        "bytes": 1063
+      },
+      {
+        "path": "licenses\\Microsoft-LICENSE.txt",
+        "sha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab",
+        "bytes": 1137
+      },
+      {
+        "path": "licenses\\NOTICE.txt",
+        "sha256": "54fa728da1d549cea6d24605e4a60aba78f8512f14c006011ba404b664be37c3",
+        "bytes": 1320
+      },
+      {
+        "path": "licenses\\PublicSuffixList-MPL-2.0.txt",
+        "sha256": "9221c2f936159b8446d329249fb4c0f25be510f447383a0f13336ac7985668a3",
+        "bytes": 17099
+      },
+      {
+        "path": "licenses\\SQLitePCLRaw-LICENSE.txt",
+        "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+        "bytes": 11560
+      },
+      {
+        "path": "Microsoft.Data.Sqlite.dll",
+        "sha256": "9f1fe804321767b6cc8db751ecedd56ab308e5f15492a7f40d7093bb61ab7638",
+        "bytes": 177464
+      },
+      {
+        "path": "MozChecker.Core.dll",
+        "sha256": "c2c46a346b941264d123eb295cd18ddc222361caab23b1d45657ec7288b45dba",
+        "bytes": 345600
+      },
+      {
+        "path": "MozChecker.Core.pdb",
+        "sha256": "23564ffe0c7e151add76fa697054a73300474d5fd3d5b6c11bb1e52bb1261e86",
+        "bytes": 37092
+      },
+      {
+        "path": "MozChecker.deps.json",
+        "sha256": "f7ec40269f37a76e9d24014e8480b257c356bcbeb0777c86f951ee8dd3547076",
+        "bytes": 5850
+      },
+      {
+        "path": "MozChecker.dll",
+        "sha256": "084ab83e337852f97cfc6ab63d05b85765422a4effc8c76cced6568a0df7aace",
+        "bytes": 86528
+      },
+      {
+        "path": "MozChecker.exe",
+        "sha256": "33fe012dc6bf5ca41006c324b7ddbc5aa5857b69dd9b83ad45eff6464ccba46d",
+        "bytes": 162816
+      },
+      {
+        "path": "MozChecker.pdb",
+        "sha256": "33bf4580f889af8d5daf646da708495fa39c274b5ea9754d710d08e1bdfb8343",
+        "bytes": 33112
+      },
+      {
+        "path": "MozChecker.runtimeconfig.json",
+        "sha256": "96bc2946dff8790400d652ec7f8de7bb043e954980d59470c112788b68a1fbd3",
+        "bytes": 519
+      },
+      {
+        "path": "README.txt",
+        "sha256": "dd6ffafba87d1ebd0c462cfe51b4fc30992cf09fc7f7e7c5d2285236d955c612",
+        "bytes": 2489
+      },
+      {
+        "path": "SQLitePCLRaw.batteries_v2.dll",
+        "sha256": "bc69777001eb4db81c580f62835396f67e74aaa381eef446193a904499d5310b",
+        "bytes": 5120
+      },
+      {
+        "path": "SQLitePCLRaw.core.dll",
+        "sha256": "50c999a1ab2afeacc93bce5ac2948d3bb630d99d23efc3cfcbd8bc11d3426eb7",
+        "bytes": 51200
+      },
+      {
+        "path": "SQLitePCLRaw.provider.e_sqlite3.dll",
+        "sha256": "369ea2a63067ca06328774191e0e6dc604aec8621d09b7f7c283fbbcaf533265",
+        "bytes": 36864
+      }
+    ],
+    "exeSha256": "33fe012dc6bf5ca41006c324b7ddbc5aa5857b69dd9b83ad45eff6464ccba46d",
+    "authenticode": "NotSigned",
+    "defender": {
+      "AMServiceEnabled": true,
+      "AntivirusEnabled": true,
+      "RealTimeProtectionEnabled": true,
+      "BehaviorMonitorEnabled": true,
+      "AMEngineVersion": "1.1.26090.9",
+      "AntivirusSignatureVersion": "1.461.118.0",
+      "AntivirusSignatureLastUpdated": "2026-10-20T07:02:06+00:00"
+    },
+    "preferences": {
+      "DisableRealtimeMonitoring": false,
+      "DisableBehaviorMonitoring": false,
+      "MAPSReporting": 0,
+      "SubmitSamplesConsent": 2
+    },
+    "applicableExclusions": {
+      "extensions": [],
+      "paths": [
+        "C:\\"
+      ],
+      "processes": []
+    },
+    "exclusionsRemovedOnDisposableRunner": true,
+    "scanExitCode": 0,
+    "firewallProfiles": [
+      {
+        "Name": "Domain",
+        "Enabled": 1
+      },
+      {
+        "Name": "Private",
+        "Enabled": 1
+      },
+      {
+        "Name": "Public",
+        "Enabled": 1
+      }
+    ],
+    "testScope": "Native Windows desktop --smoke startup; empty profile, no API keys, clean child environment, outbound network blocked. This is not an audit of every feature.",
+    "appExitCode": 0,
+    "detections": [],
+    "finalDefender": {
+      "RealTimeProtectionEnabled": true,
+      "BehaviorMonitorEnabled": true
+    },
+    "limitation": "One runner, engine/signature and startup path. Does not invalidate a different endpoint detection or establish a false positive."
+  },
+  "wpf_smoke": {
+    "ui": "WPF",
+    "checks": [
+      "IDN/PSL",
+      "eight columns",
+      "available-only results",
+      "registered log",
+      "search",
+      "reset",
+      "CSV button states",
+      "immediate CSV parsing",
+      "large-list import preview",
+      "single full-list session",
+      "aggregate progress",
+      "queue/event separation",
+      "persistent timestamped log"
+    ],
+    "status": "passed"
+  },
+  "build_run": "https://github.com/bisrib613/moz-checker/actions/runs/39440577252",
+  "source_commit": "4ee0b9861b4e307618e7ef08728a9ed0d4ced934",
+  "package_sha256": "63fb6f1b2d0a04e25aa7d808a2bd11e4b405a7a5b2563e8c49a84243415f3d92",
+  "package_bytes": 1635389,
+  "core_tests": {
+    "windows": 63,
+    "linux": 63
+  },
+  "limitation": "Limited runner testing; previous Python endpoint investigation remains unresolved"
+}
