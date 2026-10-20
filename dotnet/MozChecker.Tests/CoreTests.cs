@@ -47,6 +47,56 @@ public sealed class CoreTests : IDisposable
         Assert.Throws<ArgumentException>(() => Domains.Parse(string.Join('\n', Enumerable.Range(0, 1001).Select(i => $"d{i}.com"))));
         Assert.Throws<ArgumentException>(() => Domains.Parse("\"google.com"));
     }
+    [Theory]
+    [InlineData("DA;Domain Name;Notes\r\n90;https://www.GOOGLE.com/path;test\r\n80;google.com;duplicate\r\n70;co.id;invalid")]
+    [InlineData("DA\tWebsite URL\tNotes\r\n90\thttps://www.GOOGLE.com/path\ttest\r\n80\tgoogle.com\tduplicate\r\n70\tco.id\tinvalid")]
+    [InlineData("\uFEFFsep=;\r\nDA;domain_name;Notes\r\n90;https://www.GOOGLE.com/path;test\r\n80;google.com;duplicate\r\n70;co.id;invalid")]
+    [InlineData("DA,DOMAIN,Notes\r\n90,\"https://www.GOOGLE.com/path\",\"text, with comma\nand newline\"\r\n80,google.com,duplicate\r\n70,co.id,invalid")]
+    public void CommonCsvExportsExtractOnlyDomainColumn(string text)
+    {
+        var imported = Domains.Parse(text, limit: null);
+        Assert.Equal(new[] { "google.com" }, imported.Domains);
+        Assert.Equal(1, imported.Duplicates);
+        Assert.Equal(new[] { "co.id" }, imported.Invalid);
+    }
+    [Fact]
+    public void ExplicitDomainColumnTakesPriorityOverPageUrl()
+    {
+        var imported = Domains.Parse("URL,Domain Name,DA\nhttps://sub.google.com/path,google.com,90", limit: null);
+        Assert.Equal(new[] { "google.com" }, imported.Domains);
+        Assert.Empty(imported.Invalid);
+    }
+    [Fact]
+    public void HeaderlessCsvWithMetricsInfersDomainColumn()
+    {
+        var imported = Domains.Parse("80,google.com,20\n90,example.org,30", limit: null);
+        Assert.Equal(new[] { "google.com", "example.org" }, imported.Domains);
+        Assert.Empty(imported.Invalid);
+        var allCells = Domains.Parse("google.com,example.org\nbing.com,example.net", limit: null);
+        Assert.Equal(4, allCells.Domains.Count);
+    }
+    [Fact]
+    public void LargeImportIsDeduplicatedBeforeBatchingWithoutTruncation()
+    {
+        using var store = Open();
+        var input = string.Join('\n', Enumerable.Range(0, 2501).Select(i => $"import{i}.com")) + "\nIMPORT0.com\nco.id";
+        var imported = Domains.Parse(input, limit: null);
+        Assert.Equal(2501, imported.Domains.Count);
+        Assert.Equal(1, imported.Duplicates);
+        Assert.Single(imported.Invalid);
+        var jobs = store.NewJobs(imported.Domains);
+        Assert.Equal(3, jobs.Count);
+        Assert.Equal(new[] { 1000, 1000, 501 }, jobs.Select(id => store.Results(id).Count));
+        Assert.Equal(imported.Domains, jobs.SelectMany(store.Results).Select(r => r.Domain));
+        Assert.All(store.Jobs(), j => Assert.Equal("queued", j.State));
+    }
+    [Fact]
+    public void NewJobsRejectsEmptyListWithoutCreatingPartialQueue()
+    {
+        using var store = Open();
+        Assert.Throws<ArgumentException>(() => store.NewJobs([]));
+        Assert.Empty(store.Jobs());
+    }
     [Fact]
     public void AvailableRequiresFreshProofAndHistory()
     {

@@ -43,3 +43,7 @@ Native WPF empty workspace captured from the protected Windows smoke run (no rea
 ![Native WPF workspace](desktop-wpf.png)
 
 Verified native build: [39400588371](https://github.com/bisrib613/moz-checker/actions/runs/39400588371), source `aa5b912d58abaa115bd8abe674d0ff926ff0d9e3`; 37 tests on each OS, protected WPF smoke passed. The final ZIP is 1,607,957 bytes (about 1.6 MB), excluding the required .NET Desktop Runtime. All 21 payload files match the protected test copy. See [evidence](security/v0.3.0-wpf-evidence.json). Publication is allowed only for the exact reviewed v0.3.0 preview; the previous investigation remains open.
+
+## 0.3.1 CSV import fix
+
+Import parses CSV/TXT/TSV immediately on a background task and replaces the raw file with normalized unique domains plus duplicate/invalid counts. Comma, semicolon, tab, quoted fields/newlines, Excel sep=, BOM and common domain-header aliases are supported; a domain column takes priority over page URL. Headerless numeric exports infer an unambiguous domain column. Files remain limited to 5 MB. Large imported/pasted lists have no 1,000-domain import cap: Start atomically persists all domains in queued huntings of at most 1,000 each. The generator retains its existing 1,000-combination limit. No RDAP/API requests run during parsing.

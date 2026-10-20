@@ -1,4 +1,4 @@
-Moz Checker 0.3.0 - Windows 11 x64 / C# + WPF
+Moz Checker 0.3.1 - Windows 11 x64 / C# + WPF
 
 Requires Microsoft .NET 10 Desktop Runtime x64:
 https://dotnet.microsoft.com/en-us/download/dotnet/10.0
@@ -8,7 +8,7 @@ This is a framework-dependent build; it does not contain the .NET runtime.
 
 Security review remains unresolved for the prior Python release. A .NET migration
 or a scan without detections does not prove the cause or establish a false positive.
-Public release remains on hold. Never disable antivirus or restore a quarantined
+Unreviewed releases are blocked; previews require exact build/hash review. Never disable antivirus or restore a quarantined
 file to make this app run. See docs/SECURITY-INVESTIGATION.md in the repository.
 
 Data: %LOCALAPPDATA%\MozChecker\checker.sqlite3
@@ -23,3 +23,8 @@ pending_delete, unknown, and queued outcomes are in Log pemeriksaan.
 Available means an authoritative RDAP protocol 404 plus DNS NXDOMAIN. It is a
 candidate, not a registration guarantee. Confirm again at a registrar before buying.
 Moz uses legacy Links API v2 access ID + secret; v3 tokens are unsupported.
+
+Import: CSV/TXT/TSV files (up to 5 MB) are parsed immediately. Only normalized,
+unique domain names appear in the input. Comma, semicolon, tab and Excel sep=
+exports are recognized. A list larger than 1,000 domains is preserved and
+automatically split into queued huntings of up to 1,000 when you click Start.

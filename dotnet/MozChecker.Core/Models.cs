@@ -144,7 +144,7 @@ public static partial class Domains
         return host;
     }
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", RegexOptions.CultureInvariant)] private static partial Regex LabelPattern();
-    public static List<List<string>> CsvRows(string text)
+    public static List<List<string>> CsvRows(string text, char separator = ',')
     {
         var rows = new List<List<string>>();
         var row = new List<string>();
@@ -163,7 +163,7 @@ public static partial class Domains
                 else
                     quoted = !quoted;
             }
-            else if (c == ',' && !quoted)
+            else if (c == separator && !quoted)
             {
                 row.Add(cell.ToString());
                 cell.Clear();
@@ -189,15 +189,76 @@ public static partial class Domains
         }
         return rows;
     }
-    public static ImportResult Parse(string text)
+    private static string HeaderName(string value) => Regex.Replace(value.Trim().ToLowerInvariant(), @"[\s_\-]+", "");
+    private static readonly HashSet<string> DomainHeaders = ["domain", "domains", "domainname", "domainnames", "domainurl", "url", "urls", "website", "websiteurl", "hostname", "host", "fqdn"];
+    private static bool IsDomainHeader(string value) => DomainHeaders.Contains(HeaderName(value));
+    private static char DetectSeparator(string text)
     {
-        var rows = CsvRows(text.TrimStart('\uFEFF'));
+        // Read only the first logical record, honoring quoted newlines and escaped quotes.
+        var quoted = false;
+        var end = text.Length;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '"')
+            {
+                if (quoted && i + 1 < text.Length && text[i + 1] == '"')
+                    i++;
+                else
+                    quoted = !quoted;
+            }
+            else if (!quoted && text[i] is '\r' or '\n')
+            {
+                end = i;
+                break;
+            }
+        }
+        var first = text[..end];
+        return new[] { ',', ';', '\t' }.Select(separator =>
+        {
+            var row = CsvRows(first, separator).FirstOrDefault() ?? [];
+            return (Separator: separator, HasHeader: row.Any(IsDomainHeader), Columns: row.Count);
+        }).OrderByDescending(x => x.HasHeader).ThenByDescending(x => x.Columns).First().Separator;
+    }
+    private static bool LooksLikeDomain(string value)
+    {
+        try
+        {
+            Normalize(value);
+            return true;
+        }
+        catch (ArgumentException) { return false; }
+    }
+    public static ImportResult Parse(string text, int? limit = 1000)
+    {
+        text = text.TrimStart('\uFEFF', '\r', '\n');
+        char separator;
+        if (text.Length >= 5 && text.StartsWith("sep=", StringComparison.OrdinalIgnoreCase) && text[4] is ',' or ';' or '\t' && (text.Length == 5 || text[5] is '\r' or '\n'))
+        {
+            separator = text[4];
+            text = text[5..].TrimStart('\r', '\n');
+        }
+        else
+            separator = DetectSeparator(text);
+        var rows = CsvRows(text, separator).Where(row => row.Any(x => !string.IsNullOrWhiteSpace(x))).ToList();
         var domains = new List<string>();
         var seen = new HashSet<string>();
         var invalid = new List<string>();
         var duplicates = 0;
-        var column = rows.Count == 0 ? -1 : rows[0].FindIndex(x => new[] { "domain", "domains", "url" }.Contains(x.Trim().ToLowerInvariant()));
-        IEnumerable<string> values = column >= 0 ? rows.Skip(1).Where(x => x.Count > column).Select(x => x[column]) : rows.SelectMany(x => x).SelectMany(x => Regex.Split(x, @"[;\s]+"));
+        var column = rows.Count == 0 ? -1 : rows[0].Select((cell, index) => (cell, index))
+            .Where(x => IsDomainHeader(x.cell)).OrderBy(x => HeaderName(x.cell).StartsWith("domain", StringComparison.Ordinal) ? 0 : 1)
+            .Select(x => x.index).DefaultIfEmpty(-1).First();
+        var hasHeader = column >= 0;
+        if (column < 0 && rows.Any(row => row.Count > 1))
+        {
+            // Headerless exports with numeric metadata: infer only an unambiguous domain column.
+            // If several columns contain domains, retain all candidate cells instead of dropping data.
+            var candidates = rows.Take(30).SelectMany(row => row.Select((cell, index) => (cell, index)))
+                .Where(x => LooksLikeDomain(x.cell)).Select(x => x.index).Distinct().Take(2).ToArray();
+            if (candidates.Length == 1)
+                column = candidates[0];
+        }
+        IEnumerable<string> values = column >= 0 ? rows.Skip(hasHeader ? 1 : 0).Select(row => row.Count > column ? row[column] : "")
+            : rows.SelectMany(row => row).SelectMany(cell => Regex.Split(cell, @"[;\s]+"));
         foreach (var raw in values.Where(x => !string.IsNullOrWhiteSpace(x)))
         {
             string domain;
@@ -210,8 +271,8 @@ public static partial class Domains
                 domains.Add(domain);
             else
                 duplicates++;
-            if (domains.Count > 1000)
-                throw new ArgumentException("Maksimal 1.000 domain unik per hunting.");
+            if (limit is { } maximum && domains.Count > maximum)
+                throw new ArgumentException($"Maksimal {maximum:N0} domain unik per hunting.");
         }
         return new(domains, duplicates, invalid);
     }

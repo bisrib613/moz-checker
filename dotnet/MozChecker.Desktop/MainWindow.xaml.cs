@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private string jobsSignature = "";
     private bool updating;
     private bool closing;
+    private bool importing;
     private bool closedAfterStop;
     private FilterValues filters = new();
     private string? CurrentJob => (Jobs.SelectedItem as Job)?.Id;
@@ -131,36 +132,68 @@ public partial class MainWindow : Window
     }
     private void StartClick(object sender, RoutedEventArgs e)
     {
+        if (importing)
+            return;
         try
         {
-            var parsed = Domains.Parse(DomainInput.Text);
+            var parsed = Domains.Parse(DomainInput.Text, limit: null);
             InputFeedback.Text = $"{parsed.Domains.Count} unik · {parsed.Duplicates} duplikat · {parsed.Invalid.Count} tidak valid";
             if (parsed.Domains.Count == 0)
                 throw new ArgumentException("Masukkan minimal satu domain yang valid.");
-            var job = store.NewJob(parsed.Domains);
+            var jobs = store.NewJobs(parsed.Domains);
+            InputFeedback.Text += $" · {jobs.Count} hunting diantrekan";
             Refresh();
-            Jobs.SelectedItem = ((IEnumerable<Job>)Jobs.ItemsSource).First(x => x.Id == job);
+            Jobs.SelectedItem = ((IEnumerable<Job>)Jobs.ItemsSource).First(x => x.Id == jobs[0]);
             Refresh(true);
             engine.Start();
         }
         catch (ArgumentException ex) { InputFeedback.Text = ex.Message; DomainInput.Focus(); }
     }
-    private void ImportClick(object sender, RoutedEventArgs e)
+    private void ApplyImport(ImportResult parsed)
     {
-        var dialog = new OpenFileDialog { Filter = "Daftar domain (*.csv;*.txt)|*.csv;*.txt|Semua file|*.*" };
+        if (parsed.Domains.Count == 0)
+            throw new ArgumentException($"Tidak ditemukan domain valid ({parsed.Invalid.Count} tidak valid). Daftar sebelumnya tidak diubah.");
+        DomainInput.Text = string.Join('\n', parsed.Domains);
+        var batches = (parsed.Domains.Count + 999) / 1000;
+        InputFeedback.Text = $"{parsed.Domains.Count:N0} domain valid · {parsed.Duplicates:N0} duplikat dibuang · {parsed.Invalid.Count:N0} tidak valid" + (batches > 1 ? $" · akan dibagi menjadi {batches:N0} hunting" : "");
+    }
+    private async void ImportClick(object sender, RoutedEventArgs e)
+    {
+        if (importing)
+            return;
+        var dialog = new OpenFileDialog { Filter = "Daftar domain (*.csv;*.txt;*.tsv)|*.csv;*.txt;*.tsv|Semua file|*.*" };
         if (dialog.ShowDialog(this) != true)
             return;
+        importing = true;
+        StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = false;
+        InputFeedback.Text = "Membaca dan memisahkan domain…";
         try
         {
-            if (new FileInfo(dialog.FileName).Length > 5_000_000)
-                throw new ArgumentException("File maksimal 5 MB.");
-            DomainInput.Text = File.ReadAllText(dialog.FileName);
-            InputFeedback.Text = "Daftar diimpor. Tekan Mulai hunting untuk memeriksa.";
+            var parsed = await Task.Run(() =>
+            {
+                if (new FileInfo(dialog.FileName).Length > 5_000_000)
+                    throw new ArgumentException("File maksimal 5 MB.");
+                return Domains.Parse(File.ReadAllText(dialog.FileName), limit: null);
+            });
+            if (!closing)
+                ApplyImport(parsed);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { InputFeedback.Text = ex is ArgumentException ? ex.Message : "File tidak dapat dibaca."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            if (!closing)
+                InputFeedback.Text = ex is ArgumentException ? ex.Message : "File tidak dapat dibaca; daftar sebelumnya tidak diubah.";
+        }
+        finally
+        {
+            importing = false;
+            if (!closing)
+                StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = true;
+        }
     }
     private void GenerateClick(object sender, RoutedEventArgs e)
     {
+        if (importing)
+            return;
         try
         {
             var parsed = Domains.Parse(string.Join('\n', Domains.Generate(Keywords.Text, Tlds.Text)));
@@ -282,6 +315,14 @@ public partial class MainWindow : Window
     {
         if (Domains.Normalize("https://www.bücher.de/path") != "xn--bcher-kva.de" || ResultsGrid.Columns.Count != 8 || ExportButton.IsEnabled)
             throw new InvalidOperationException("Empty workspace smoke failed");
+        ApplyImport(Domains.Parse("score;Domain Name\r\n90;https://www.google.com/path\r\n80;GOOGLE.com\r\n70;co.id", limit: null));
+        if (DomainInput.Text != "google.com" || !InputFeedback.Text.Contains("1 duplikat dibuang") || !InputFeedback.Text.Contains("1 tidak valid"))
+            throw new InvalidOperationException("Immediate CSV import smoke failed");
+        ApplyImport(Domains.Parse(string.Join('\n', Enumerable.Range(0, 1001).Select(i => $"import{i}.com")), limit: null));
+        if (DomainInput.LineCount != 1001 || !InputFeedback.Text.Contains("2 hunting"))
+            throw new InvalidOperationException("Large CSV import smoke failed");
+        DomainInput.Clear();
+        InputFeedback.Text = "Daftar besar otomatis dibagi per 1.000 domain.";
         var job = store.NewJob(["google.com", "sample-example.com"]);
         var registered = new Result { Domain = "google.com", Status = "registered", Stage = "done", AvailabilityAt = JsonData.Now() };
         var available = new Result { Domain = "sample-example.com", Status = "available", Stage = "done", AvailabilityAt = JsonData.Now(), History = "no_history" };

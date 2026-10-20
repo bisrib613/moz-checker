@@ -51,7 +51,7 @@ public partial class App : Application
                         File.WriteAllText(System.IO.Path.Combine(directory, "smoke-report.json"), JsonData.Write(new
                         {
                             Ui = "WPF",
-                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states" },
+                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states", "immediate CSV parsing", "large-list import preview" },
                             Status = "passed"
                         }));
                         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

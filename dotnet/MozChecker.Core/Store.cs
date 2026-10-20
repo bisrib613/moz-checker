@@ -74,16 +74,29 @@ public sealed class Store : IDisposable
         var list = domains.Distinct().ToArray();
         if (list.Length is 0 or > 1000)
             throw new ArgumentException("Masukkan 1–1.000 domain.");
-        var id = Guid.NewGuid().ToString("N");
+        return NewJobs(list).Single();
+    }
+    public List<string> NewJobs(IEnumerable<string> domains)
+    {
+        var list = domains.Distinct().ToArray();
+        if (list.Length == 0)
+            throw new ArgumentException("Masukkan minimal satu domain.");
+        var ids = new List<string>();
         lock (sync)
         {
+            // Save the full imported list atomically before starting any worker.
             using var tx = db.BeginTransaction();
-            Execute("INSERT INTO jobs VALUES ($p0,$p1,'queued')", id, JsonData.Now());
-            for (int i = 0; i < list.Length; i++)
-                Execute("INSERT INTO results VALUES ($p0,$p1,$p2,$p3)", id, list[i], i, JsonData.Write(new Result { Domain = list[i] }));
+            foreach (var chunk in list.Chunk(1000))
+            {
+                var id = Guid.NewGuid().ToString("N");
+                ids.Add(id);
+                Execute("INSERT INTO jobs VALUES ($p0,$p1,'queued')", id, JsonData.Now());
+                for (int i = 0; i < chunk.Length; i++)
+                    Execute("INSERT INTO results VALUES ($p0,$p1,$p2,$p3)", id, chunk[i], i, JsonData.Write(new Result { Domain = chunk[i] }));
+            }
             tx.Commit();
         }
-        return id;
+        return ids;
     }
     public List<Job> Jobs()
     {
