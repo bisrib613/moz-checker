@@ -6,7 +6,7 @@
   <SolidColorBrush x:Key="TextBrush" Color="#EDF5F1"/>
   <SolidColorBrush x:Key="MutedBrush" Color="#A9BFB6"/>
   <SolidColorBrush x:Key="AccentBrush" Color="#87E5BD"/>
-  <SolidColorBrush x:Key="BorderBrush" Color="#48625A"/>
+  <SolidColorBrush x:Key="BorderBrush" Color="#5E7B6F"/>
   <SolidColorBrush x:Key="ErrorBrush" Color="#FFB5AC"/>
   <Style TargetType="Window"><Setter Property="Background" Value="{StaticResource CanvasBrush}"/><Setter Property="Foreground" Value="{StaticResource TextBrush}"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="14"/></Style>
   <Style TargetType="Label"><Setter Property="Foreground" Value="{StaticResource MutedBrush}"/><Setter Property="Padding" Value="0,8,0,6"/></Style>
