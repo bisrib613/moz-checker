@@ -30,7 +30,7 @@ jobs:
         run: ./scripts/audit-windows-package.ps1
       - name: Check startup with real-time and behavior protection enabled
         shell: pwsh
-        run: ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/security-audit/unpacked/MozChecker" -ReportDirectory "$PWD/security-audit/protected-startup"
+        run: ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/security-audit/unpacked/MozChecker" -ReportDirectory "$PWD/security-audit/protected-startup" -RemoveRunnerExclusions
       - name: Save diagnostic evidence even when scanning fails
         if: always()
         uses: actions/upload-artifact@v4

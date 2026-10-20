@@ -29,7 +29,7 @@ jobs:
         name: Test frozen desktop and package portable app
         shell: pwsh
         run: |
-          ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/dist/MozChecker" -ReportDirectory "$PWD/security-validation"
+          ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/dist/MozChecker" -ReportDirectory "$PWD/security-validation" -RemoveRunnerExclusions
           if ($LASTEXITCODE -ne 0) { throw "Windows security validation did not pass" }
           Compress-Archive -Path dist/MozChecker -DestinationPath dist/MozChecker-Windows-x64.zip
           $hash = (Get-FileHash dist/MozChecker-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()

@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PackageDirectory,
-    [Parameter(Mandatory = $true)][string]$ReportDirectory
+    [Parameter(Mandatory = $true)][string]$ReportDirectory,
+    [switch]$RemoveRunnerExclusions
 )
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Path $ReportDirectory -Force | Out-Null
@@ -34,7 +35,20 @@ try {
     $applicableExtensions = @($preferences.ExclusionExtension | Where-Object { $_ -in @('*', 'exe', '.exe') })
     $applicableProcesses = @($preferences.ExclusionProcess | Where-Object { 'MozChecker.exe' -like $_ -or $exe -like $_ })
     $report.applicableExclusions = @{ paths = $applicablePaths; extensions = $applicableExtensions; processes = $applicableProcesses }
-    if ($applicablePaths.Count -or $applicableExtensions.Count -or $applicableProcesses.Count) { throw 'The test target is excluded by runner policy; cannot claim a covered scan' }
+    if ($applicablePaths.Count -or $applicableExtensions.Count -or $applicableProcesses.Count) {
+        if (-not $RemoveRunnerExclusions -or $env:GITHUB_ACTIONS -ne 'true') { throw 'The test target is excluded by policy; no startup test performed' }
+        # GitHub's disposable VM excludes whole drives. Removing exclusions INCREASES coverage.
+        # Never run this policy change on a user device or add an app exception.
+        if ($applicablePaths.Count) { Remove-MpPreference -ExclusionPath $applicablePaths }
+        if ($applicableExtensions.Count) { Remove-MpPreference -ExclusionExtension $applicableExtensions }
+        if ($applicableProcesses.Count) { Remove-MpPreference -ExclusionProcess $applicableProcesses }
+        $preferences = Get-MpPreference
+        $remainingPaths = @($preferences.ExclusionPath | Where-Object { $exe -like $_ -or $exe -like ($_.TrimEnd('\') + '\*') })
+        $remainingExtensions = @($preferences.ExclusionExtension | Where-Object { $_ -in @('*', 'exe', '.exe') })
+        $remainingProcesses = @($preferences.ExclusionProcess | Where-Object { 'MozChecker.exe' -like $_ -or $exe -like $_ })
+        $report.exclusionsRemovedOnDisposableRunner = $true
+        if ($remainingPaths.Count -or $remainingExtensions.Count -or $remainingProcesses.Count) { throw 'Runner exclusion policy still applies; cannot validate startup' }
+    }
     $scanner = Join-Path $env:ProgramFiles 'Windows Defender/MpCmdRun.exe'
     & $scanner -Scan -ScanType 3 -File (Join-Path $auditRoot 'MozChecker') 2>&1 | Tee-Object (Join-Path $ReportDirectory 'defender-scan.txt')
     $report.scanExitCode = $LASTEXITCODE
@@ -61,6 +75,8 @@ try {
     Start-Sleep -Seconds 15
     $report.detections = @(Get-MpThreatDetection | Where-Object { ($_.Resources -join ' ') -match [regex]::Escape($auditRoot) } | Select-Object ThreatID, InitialDetectionTime, ActionSuccess, Resources)
     if ($report.appExitCode -ne 0 -or $report.detections.Count) { throw 'Startup failed or Defender detected a threat; inspect report' }
+    $report.finalDefender = Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, BehaviorMonitorEnabled
+    if (-not $report.finalDefender.RealTimeProtectionEnabled -or -not $report.finalDefender.BehaviorMonitorEnabled) { throw 'Protection was not active at the end of the test' }
     $report.status = 'protected_startup_completed_no_detections'
     $report.limitation = 'One runner, engine/signature and startup path. Does not invalidate a different endpoint detection or establish a false positive.'
 } catch {
