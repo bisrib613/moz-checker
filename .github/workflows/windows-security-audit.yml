@@ -1,0 +1,37 @@
+name: Audit published Windows package
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to inspect without executing the app'
+        required: true
+        default: 'v0.2.0'
+      expected_sha256:
+        description: 'Previously recorded ZIP SHA-256'
+        required: true
+        default: '5d8a69a7d94aba30dbd4cdb2294295227deb649fd3d1879d9c4cb0776f1fd95f'
+permissions:
+  contents: read
+jobs:
+  defender:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect published package with Microsoft Defender
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          AUDIT_VERSION: ${{ inputs.version }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        run: ./scripts/audit-windows-package.ps1
+      - name: Save diagnostic evidence even when scanning fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-security-audit
+          path: |
+            security-audit/report.json
+            security-audit/defender-scan.txt
+          if-no-files-found: warn
