@@ -1,5 +1,7 @@
 # Expired Domain Checker
 
+> **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Publikasi rilis baru ditahan. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).
+
 Aplikasi desktop Windows untuk riset expired domain. Data hunting dan cache berada di SQLite lokal; key berada di credential vault sistem. Tidak ada server pusat, pembelian domain otomatis, atau scraping tool SEO.
 
 ## Jalankan di Windows

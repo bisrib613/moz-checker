@@ -55,6 +55,13 @@ try {
     if ($report.scanExitCode -ne 0) { throw 'Static scan failed or detected a threat; application was not started' }
     $data = Join-Path $auditRoot 'empty-profile'
     New-Item -ItemType Directory -Path $data -Force | Out-Null
+    $profiles = Get-NetFirewallProfile
+    if (@($profiles | Where-Object { -not $_.Enabled }).Count) {
+        if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Firewall coverage unavailable; refusing to launch test sample' }
+        Set-NetFirewallProfile -All -Enabled True
+    }
+    $report.firewallProfiles = @(Get-NetFirewallProfile | Select-Object Name, Enabled)
+    if (@($report.firewallProfiles | Where-Object { -not $_.Enabled }).Count) { throw 'Firewall containment could not be enabled' }
     New-NetFirewallRule -DisplayName $ruleName -Direction Outbound -Program $exe -Action Block | Out-Null
     $info = [System.Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $exe

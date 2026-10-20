@@ -1,0 +1,34 @@
+{
+  "status": "protected_startup_completed_no_detections",
+  "startedAtUtc": "2026-10-20T08:31:41.2649110Z",
+  "exeSha256": "5b86ee9c80ccfc176937da27774e7de7cb0fdc22d0020ff17fa4e08045256488",
+  "authenticode": "NotSigned",
+  "defender": {
+    "AMServiceEnabled": true,
+    "AntivirusEnabled": true,
+    "RealTimeProtectionEnabled": true,
+    "BehaviorMonitorEnabled": true,
+    "AMEngineVersion": "1.1.26090.9",
+    "AntivirusSignatureVersion": "1.461.114.0",
+    "AntivirusSignatureLastUpdated": "2026-10-19T23:05:07+00:00"
+  },
+  "preferences": {
+    "DisableRealtimeMonitoring": false,
+    "DisableBehaviorMonitoring": false,
+    "MAPSReporting": 0,
+    "SubmitSamplesConsent": 2
+  },
+  "exclusionsRemovedOnDisposableRunner": true,
+  "scanExitCode": 0,
+  "appExitCode": 0,
+  "detections": [],
+  "finalDefender": {
+    "RealTimeProtectionEnabled": true,
+    "BehaviorMonitorEnabled": true
+  },
+  "limitation": "One runner, engine/signature and startup path. Does not invalidate a different endpoint detection or establish a false positive.",
+  "release": "v0.2.0",
+  "zipSha256": "5d8a69a7d94aba30dbd4cdb2294295227deb649fd3d1879d9c4cb0776f1fd95f",
+  "scope": "Native Windows Qt --smoke with empty profile/no API keys; one Windows Server runner, not Windows 10/11. An app outbound-block rule was configured; firewall profile enablement was not separately recorded in this run.",
+  "auditUrl": "https://github.com/bisrib613/moz-checker/actions/runs/39393890069"
+}
