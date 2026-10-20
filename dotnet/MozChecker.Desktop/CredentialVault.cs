@@ -26,33 +26,47 @@ internal static class CredentialVault
     [DllImport("advapi32.dll")] private static extern void CredFree(IntPtr buffer);
     private static (string User, string Value)? ReadTarget(string target)
     {
-        if (!CredRead(target, 1, 0, out var ptr)) { if (Marshal.GetLastWin32Error() == 1168) return null; throw new Win32Exception(); }
-        try { var cred = Marshal.PtrToStructure<Credential>(ptr); return (cred.UserName, Marshal.PtrToStringUni(cred.CredentialBlob, (int)cred.CredentialBlobSize / 2) ?? ""); }
+        if (!CredRead(target, 1, 0, out var ptr))
+        {
+            if (Marshal.GetLastWin32Error() == 1168)
+                return null;
+            throw new Win32Exception();
+        }
+        try
+        {
+            var cred = Marshal.PtrToStructure<Credential>(ptr);
+            return (cred.UserName, Marshal.PtrToStringUni(cred.CredentialBlob, (int)cred.CredentialBlobSize / 2) ?? "");
+        }
         finally { CredFree(ptr); }
     }
     public static string Read(string name)
     {
-        if (ReadTarget("MozChecker") is { } legacy && legacy.User == name) return legacy.Value;
+        if (ReadTarget("MozChecker") is { } legacy && legacy.User == name)
+            return legacy.Value;
         return ReadTarget(Target(name))?.Value ?? "";
     }
     public static void Save(string name, string value)
     {
-        if (name is not ("opr_key" or "moz_id" or "moz_secret")) throw new ArgumentException("Kredensial tidak dikenal");
+        if (name is not ("opr_key" or "moz_id" or "moz_secret"))
+            throw new ArgumentException("Kredensial tidak dikenal");
         var legacyMatches = ReadTarget("MozChecker")?.User == name;
         if (value.Length == 0)
         {
             foreach (var target in legacyMatches ? new[] { "MozChecker", Target(name) } : new[] { Target(name) })
-                if (!CredDelete(target, 1, 0) && Marshal.GetLastWin32Error() != 1168) throw new Win32Exception();
+                if (!CredDelete(target, 1, 0) && Marshal.GetLastWin32Error() != 1168)
+                    throw new Win32Exception();
             return;
         }
-        if (Encoding.Unicode.GetByteCount(value) > 2560) throw new ArgumentException("Kunci terlalu panjang untuk Credential Manager.");
+        if (Encoding.Unicode.GetByteCount(value) > 2560)
+            throw new ArgumentException("Kunci terlalu panjang untuk Credential Manager.");
         var ptr = Marshal.StringToCoTaskMemUni(value);
         try
         {
             foreach (var target in legacyMatches ? new[] { "MozChecker", Target(name) } : new[] { Target(name) })
             {
                 var cred = new Credential { Type = 1, TargetName = target, UserName = name, CredentialBlobSize = (uint)Encoding.Unicode.GetByteCount(value), CredentialBlob = ptr, Persist = 3 };
-                if (!CredWrite(ref cred, 0)) throw new Win32Exception();
+                if (!CredWrite(ref cred, 0))
+                    throw new Win32Exception();
             }
         }
         finally { Marshal.ZeroFreeCoTaskMemUnicode(ptr); }

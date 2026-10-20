@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MozChecker.Core/MozChecker.Core.csproj" />
+  <Project Path="MozChecker.Desktop/MozChecker.Desktop.csproj" />
+  <Project Path="MozChecker.Tests/MozChecker.Tests.csproj" />
+</Solution>

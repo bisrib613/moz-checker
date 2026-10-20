@@ -98,6 +98,7 @@ try {
     Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
     $report | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $ReportDirectory 'report.json') -Encoding utf8
     Get-Content (Join-Path $ReportDirectory 'report.json')
+    Get-ChildItem -LiteralPath $auditRoot -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('smoke-error.txt', 'smoke-report.json') } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $ReportDirectory $_.Name) -ErrorAction SilentlyContinue }
     # Do not restore a quarantined file or use this test copy for distribution.
     Remove-Item -LiteralPath $auditRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
