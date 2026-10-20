@@ -51,3 +51,11 @@ Import parses CSV/TXT/TSV immediately on a background task and replaces the raw 
 ## 0.3.2 import size limit removal
 
 The 5 MB import-file rejection is removed. CSV/TXT/TSV parsing continues on the background worker with the same normalization and duplicate reporting. Lists still queue in huntings of up to 1,000 domains; no input is truncated by file size. There is no replacement fixed file-size cap.
+
+## 0.4.0 full-list workspace and event log
+
+The previous 1,000-record job split is removed, including the default parser/generator limit. Each new imported/pasted/generated list becomes one examination. The engine reads pending rows via an indexed cursor; the UI uses SQLite-maintained totals and 200-row view pages, not a 1,000-domain processing cutoff. All prior jobs remain intact and default to an aggregate view; Resume on that view resumes all paused examinations.
+
+The light native workspace separates available, other checked results, queue/in-progress and a persistent event log. Queue creation does not log unprocessed domains. Events show actual save-time timestamps and monotonically increasing sequence numbers, latest first; session events identify start/pause/completion. Legacy results retain original source timestamps in Other results/evidence; migration records an explanatory event instead of inventing old event times. Log pages freeze at an event sequence when browsing older records; Terbaru resumes live updates.
+
+The additive SQLite migration builds query indexes and trigger-maintained counters transactionally. Existing JSON/result/quota data stays compatible. Large list creation/parsing/export run off the UI thread. The input preview explicitly shows 200 of N; all N are persisted in one job. Export streams every matching available record, not only the current display page.

@@ -12,35 +12,46 @@ namespace MozChecker.Desktop;
 
 public partial class MainWindow : Window
 {
+    private sealed record Scope(string? Id, string Label)
+    {
+        public override string ToString() => Label;
+    }
+    private sealed record Snapshot(List<Job> Jobs, WorkspaceCounts Counts, ResultPage? Results, EventPage? Events);
     private readonly Store store;
     private readonly Transport transport = new();
     private Engine engine;
-    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(500) };
-    private List<Result> results = [];
-    private string signature = "";
-    private string jobsSignature = "";
-    private bool updating;
-    private bool closing;
-    private bool importing;
-    private bool closedAfterStop;
+    private readonly bool smokeMode;
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool closing, closedAfterStop, updating, refreshing, preparing;
+    private Task? inputWork, refreshWork;
+    private ImportResult? preparedImport;
+    private string? scope;
     private FilterValues filters = new();
-    private string? CurrentJob => (Jobs.SelectedItem as Job)?.Id;
-    private ICollectionView? view;
+    private int page;
+    private const int PageSize = 200;
+    private long rowCount;
+    private long? eventAnchor;
+    private string sort = "", lastJobs = "";
+    private bool descending;
+    private long request;
     public MainWindow(Store store, ApiKeys keys, bool smoke = false)
     {
         this.store = store;
+        smokeMode = smoke;
         engine = NewEngine(keys);
         InitializeComponent();
-        timer.Tick += (_, _) => Refresh();
-        timer.Start();
+        ConfigureColumns();
+        timer.Tick += async (_, _) => await RefreshAsync();
+        if (!smoke)
+            timer.Start();
         ResultsGrid.SelectionChanged += (_, _) => EvidenceButton.IsEnabled = ResultsGrid.SelectedItem is Result;
-        CommandBindings.Add(new(ApplicationCommands.Find, (_, _) => Search.Focus()));
-        InputBindings.Add(new KeyBinding(ApplicationCommands.Find, Key.F, ModifierKeys.Control));
+        AddShortcut(Key.F, () => Search.Focus());
         AddShortcut(Key.Enter, () => StartClick(this, new()));
         AddShortcut(Key.O, () => ImportClick(this, new()));
         AddShortcut(Key.OemComma, () => SettingsClick(this, new()));
         Closing += OnClosing;
-        Refresh();
+        if (!smoke)
+            Loaded += async (_, _) => await RefreshAsync();
         if (!smoke)
             DomainInput.Focus();
     }
@@ -51,197 +62,353 @@ public partial class MainWindow : Window
         CommandBindings.Add(new(command, (_, _) => action()));
         InputBindings.Add(new KeyBinding(command, key, ModifierKeys.Control));
     }
-    private void Refresh(bool force = false)
+    private ResultFilter QueryFilter() => new(Search.Text.Trim(), filters.Tld, filters.History, filters.MaxLength, filters.Opr, filters.Da, filters.Snapshots);
+    private void ConfigureColumns()
     {
-        if (updating || closing)
+        if (ResultsGrid is null)
             return;
-        var selected = CurrentJob;
-        var jobs = store.Jobs();
-        var jobSig = JsonData.Write(jobs);
-        if (jobSig != jobsSignature)
+        ResultsGrid.Columns.Clear();
+        void Column(string title, string property, double width = 100, string? format = null)
         {
-            updating = true;
-            Jobs.ItemsSource = jobs.AsEnumerable().Reverse().ToList();
-            Jobs.SelectedItem = jobs.FirstOrDefault(x => x.Id == selected) ?? jobs.LastOrDefault();
-            updating = false;
-            jobsSignature = jobSig;
+            var binding = new Binding(property) { TargetNullValue = "—" };
+            if (format is not null)
+                binding.StringFormat = format;
+            ResultsGrid.Columns.Add(new DataGridTextColumn { Header = title, Binding = binding, SortMemberPath = property, Width = new DataGridLength(width) });
         }
-        var all = CurrentJob is { } id ? store.Results(id) : [];
-        var nextSignature = JsonData.Write(all) + string.Join('|', all.Select(x => x.Readiness));
-        if (force || nextSignature != signature)
+        Column("Domain", "Domain", 190);
+        if (ResultTabs.SelectedIndex == 0)
         {
-            var selection = (ResultsGrid.SelectedItem as Result)?.Domain;
-            results = all;
-            signature = nextSignature;
-            // A private view keeps sorting/filter state separate from the log and job list.
-            var sort = view?.SortDescriptions.ToArray() ?? [];
-            view = new ListCollectionView(results.Where(x => x.Status == "available").ToList());
-            view.Filter = Matches;
-            foreach (var s in sort)
-                view.SortDescriptions.Add(s);
-            ResultsGrid.ItemsSource = view;
-            ResultsGrid.SelectedItem = results.FirstOrDefault(x => x.Domain == selection && x.Status == "available");
-            Log.Text = results.Count == 0 ? "Belum ada pemeriksaan." : string.Join('\n', results.Select(r => $"{r.Domain} · {r.Status} · {r.Stage}" + (r.Errors.Count == 0 ? "" : "\n  " + string.Join(" | ", r.Errors.Select(p => p.Key + ": " + p.Value)))));
+            Column("OPR", "Opr", 75, "F2");
+            Column("Moz DA", "Da", 80, "F0");
+            Column("Moz PA", "Pa", 80, "F0");
+            Column("Spam", "Spam", 75, "F0");
+            Column("Riwayat", "History", 110);
+            Column("Snapshot", "Snapshots", 85);
+            Column("Kesiapan", "Readiness", 210);
         }
-        AvailableStat.Text = results.Count(x => x.Status == "available").ToString();
-        CheckedStat.Text = results.Count(x => x.AvailabilityAt.Length > 0).ToString();
-        HistoryStat.Text = results.Count(x => x.Status == "available" && x.History is "valid" or "no_history").ToString();
-        RegisteredStat.Text = results.Count(x => x.Status == "registered").ToString();
-        var completed = results.Count(x => x.Stage == "done");
-        Progress.Maximum = Math.Max(1, results.Count);
-        Progress.Value = completed;
-        ProgressText.Text = engine.Failure.Length > 0 ? engine.Failure : results.Count > 0 ? $"{completed} / {results.Count} domain selesai · {((Job?)Jobs.SelectedItem)?.State} · RDAP → DNS → OPR → Wayback → Moz" : "Workspace siap. Masukkan daftar domain untuk mulai.";
-        var settings = store.GetSettings();
-        var used = store.Used(settings.Period);
-        QuotaText.Text = $"{used} / {settings.MozBudget} rows terpakai\nCadangan {settings.MozReserve} · tersedia {Math.Max(0, settings.MozBudget - settings.MozReserve - used)}\nPeriode {settings.Period}";
-        StartButton.Content = engine.Running ? "Tambahkan ke antrean" : "Mulai hunting";
-        PauseButton.IsEnabled = engine.Running;
-        ResumeButton.IsEnabled = !engine.Running && Jobs.SelectedItem is Job { State: "paused" or "queued" };
-        RetryButton.IsEnabled = !engine.Running && results.Any(x => x.Errors.Count > 0 || x.History == "unchecked" || x.Status == "unknown");
-        EvidenceButton.IsEnabled = ResultsGrid.SelectedItem is Result;
-        UpdateEmpty();
-    }
-    private bool Matches(object item) => item is Result r && r.Domain.Contains(Search.Text.Trim(), StringComparison.OrdinalIgnoreCase) && filters.Matches(r);
-    private void UpdateEmpty()
-    {
-        if (ResultsGrid is null || ExportButton is null)
-            return;
-        var count = view?.Cast<Result>().Count() ?? 0;
-        EmptyState.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyTitle.Text = results.Any(x => x.Status == "available") ? "Tidak ada yang cocok" : "Shortlist masih kosong";
-        EmptyDescription.Text = results.Any(x => x.Status == "available") ? "Ubah pencarian atau reset filter." : results.Count > 0 ? "Registered dan hasil lainnya ada di log pemeriksaan." : "Mulai hunting untuk menemukan domain available.";
-        ExportButton.IsEnabled = ResultTabs.SelectedIndex == 0 && count > 0;
-    }
-    private void JobsChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!updating && IsLoaded)
+        else if (ResultTabs.SelectedIndex == 1)
         {
-            signature = "";
-            Refresh(true);
+            Column("Status", "StatusText", 120);
+            Column("RDAP", "RdapHttp", 65);
+            Column("DNS", "Dns", 110);
+            Column("Waktu cek UTC", "AvailabilityAt", 220);
+            Column("Registrar", "Registrar", 170);
+            Column("Kedaluwarsa", "Expires", 200);
+            Column("Tahap", "Stage", 120);
+        }
+        else
+        {
+            Column("Keadaan antrean", "WorkState", 125);
+            Column("Tahap terakhir", "Stage", 125);
+            Column("Status terakhir", "StatusText", 150);
+            Column("Waktu cek terakhir UTC", "AvailabilityAt", 230);
+            Column("Pemeriksaan", "JobId", 240);
         }
     }
-    private void SearchChanged(object sender, TextChangedEventArgs e)
+    private async Task RefreshAsync()
     {
-        view?.Refresh();
-        UpdateEmpty();
-    }
-    private void TabChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (e.Source == ResultTabs)
-            UpdateEmpty();
-    }
-    private void StartClick(object sender, RoutedEventArgs e)
-    {
-        if (importing)
+        if (closing || preparing || refreshing)
             return;
+        refreshing = true;
+        var selected = scope;
+        var tab = ResultTabs.SelectedIndex;
+        var selectedPage = page;
+        var filter = QueryFilter();
+        var anchor = eventAnchor;
+        var selectedSort = sort;
+        var desc = descending;
+        var revision = request;
         try
         {
-            var parsed = Domains.Parse(DomainInput.Text, limit: null);
-            InputFeedback.Text = $"{parsed.Domains.Count} unik · {parsed.Duplicates} duplikat · {parsed.Invalid.Count} tidak valid";
-            if (parsed.Domains.Count == 0)
-                throw new ArgumentException("Masukkan minimal satu domain yang valid.");
-            var jobs = store.NewJobs(parsed.Domains);
-            InputFeedback.Text += $" · {jobs.Count} hunting diantrekan";
-            Refresh();
-            Jobs.SelectedItem = ((IEnumerable<Job>)Jobs.ItemsSource).First(x => x.Id == jobs[0]);
-            Refresh(true);
-            engine.Start();
+            var work = Task.Run(() => store.ReadConsistent(s => new Snapshot(s.Jobs(), s.Counts(selected), tab == 3 ? null : s.Page(selected, tab, filter, selectedPage, PageSize, selectedSort, desc), tab == 3 ? s.Events(selected, filter.Search, selectedPage, anchor, PageSize) : null)));
+            refreshWork = work;
+            var snapshot = await work;
+            if (closing || revision != request)
+                return;
+            Render(snapshot);
         }
-        catch (ArgumentException ex) { InputFeedback.Text = ex.Message; DomainInput.Focus(); }
+        catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException) { if (!closing) ViewStatus.Text = "Pembacaan data gagal; coba muat ulang. " + ex.GetType().Name; }
+        finally { refreshing = false; }
+    }
+    private void Render(Snapshot snapshot)
+    {
+        updating = true;
+        var jobsSignature = JsonData.Write(snapshot.Jobs);
+        if (lastJobs != jobsSignature)
+        {
+            Jobs.ItemsSource = new[] { new Scope(null, "Semua pemeriksaan (progres dan hasil gabungan)") }.Concat(snapshot.Jobs.AsEnumerable().Reverse().Select(j => new Scope(j.Id, j.ToString()))).ToList();
+            Jobs.SelectedItem = ((IEnumerable<Scope>)Jobs.ItemsSource).FirstOrDefault(s => s.Id == scope) ?? ((IEnumerable<Scope>)Jobs.ItemsSource).First();
+            lastJobs = jobsSignature;
+        }
+        var c = snapshot.Counts;
+        Progress.Maximum = Math.Max(1, c.Total);
+        Progress.Value = c.Done;
+        ProgressText.Text = $"Total {c.Total:N0} · Selesai {c.Done:N0} · Belum selesai {c.Pending:N0} · Menunggu {Math.Max(0, c.Pending - c.Active):N0} · Diproses {c.Active:N0}";
+        var running = snapshot.Jobs.Where(j => j.State == "running").Select(j => j.Id[..8]).ToArray();
+        SessionStatus.Text = engine.Failure.Length > 0 ? engine.Failure : $"Aktif: {(running.Length == 0 ? "tidak ada" : string.Join(", ", running))} · Pemeriksaan selesai {snapshot.Jobs.Count(j => j.State == "completed"):N0}, menunggu {snapshot.Jobs.Count(j => j.State == "queued"):N0}, dijeda {snapshot.Jobs.Count(j => j.State == "paused"):N0}";
+        ResultSummary.Text = $"Dalam tampilan ini: diperiksa {c.Checked:N0} · Available {c.Available:N0} · Registered {c.Registered:N0} · Riwayat lolos {c.Passed:N0}";
+        AvailableTab.Header = $"Available ({c.Available:N0})";
+        OtherTab.Header = $"Hasil lainnya ({c.Other:N0})";
+        QueueTab.Header = $"Antrean / proses ({c.Pending:N0})";
+        EventsTab.Header = $"Log kejadian ({c.Events:N0})";
+        var selection = ResultsGrid.SelectedItem as Result;
+        var logView = ResultTabs.SelectedIndex == 3;
+        ResultsGrid.Visibility = logView ? Visibility.Collapsed : Visibility.Visible;
+        LogGrid.Visibility = logView ? Visibility.Visible : Visibility.Collapsed;
+        if (logView)
+        {
+            LogGrid.ItemsSource = snapshot.Events!.Rows;
+            rowCount = snapshot.Events.Total;
+            var last = snapshot.Events.Rows.FirstOrDefault();
+            ViewStatus.Text = last is null ? "Belum ada kejadian pada cakupan ini. Baris antrean tidak ditulis sebagai log." : $"Terbaru di atas · kejadian terakhir dalam halaman: #{last.Sequence:N0}, {last.LocalTime} · baris menunggu bukan log. " + (eventAnchor.HasValue ? "Riwayat dikunci; klik Terbaru untuk mengikuti kejadian baru." : "Mengikuti kejadian baru.");
+        }
+        else
+        {
+            ResultsGrid.ItemsSource = snapshot.Results!.Rows;
+            ResultsGrid.SelectedItem = snapshot.Results.Rows.FirstOrDefault(r => r.Domain == selection?.Domain && r.JobId == selection?.JobId);
+            rowCount = snapshot.Results.Total;
+            ViewStatus.Text = ResultTabs.SelectedIndex == 2 ? "Antrean berisi domain belum selesai. Status 'Belum diperiksa' berarti belum ada hasil RDAP/DNS; tahap yang tersimpan bukan bukti proses sedang aktif." : ResultTabs.SelectedIndex == 1 ? "Hasil pemeriksaan tersimpan: registered, redemption, pending delete dan unknown. Waktu cek tersedia per baris." : "Available dari seluruh cakupan / filter; ekspor mencakup semua halaman. Perpindahan halaman tidak membatasi jumlah domain yang diperiksa.";
+        }
+        EmptyState.Visibility = rowCount == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Text = (filters.Active || Search.Text.Length > 0) ? "Tidak ada baris yang cocok dengan filter." : logView ? "Belum ada kejadian. Antrean tidak dimasukkan ke log." : ResultTabs.SelectedIndex == 2 ? "Tidak ada domain yang belum selesai." : "Belum ada hasil yang cocok.";
+        PageText.Text = rowCount == 0 ? "0 baris" : $"{(long)page * PageSize + 1:N0}–{Math.Min(rowCount, ((long)page + 1) * PageSize):N0} dari {rowCount:N0} · halaman {page + 1:N0}";
+        PreviousButton.IsEnabled = page > 0;
+        NextButton.IsEnabled = ((long)page + 1) * PageSize < rowCount;
+        ExportButton.IsEnabled = !preparing && !logView && ResultTabs.SelectedIndex == 0 && rowCount > 0;
+        EvidenceButton.IsEnabled = !logView && ResultsGrid.SelectedItem is Result;
+        PauseButton.IsEnabled = engine.Running;
+        ResumeButton.IsEnabled = !engine.Running && snapshot.Jobs.Any(j => (scope is null || j.Id == scope) && j.State is "paused" or "queued");
+        RetryButton.IsEnabled = !engine.Running && c.Total > 0;
+        var settings = store.GetSettings();
+        var used = store.Used(settings.Period);
+        QuotaText.Text = $"Moz lokal: {used}/{settings.MozBudget} · cadangan {settings.MozReserve}";
+        StartButton.Content = engine.Running ? "Antrekan daftar baru" : "Mulai pemeriksaan";
+        updating = false;
+    }
+    private async void JobsChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (smokeMode || updating || !IsLoaded)
+            return;
+        scope = (Jobs.SelectedItem as Scope)?.Id;
+        ResetPage();
+        await RefreshAsync();
+    }
+    private void ResetPage()
+    {
+        page = 0;
+        eventAnchor = null;
+        request++;
+    }
+    private async void SearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (smokeMode || !IsLoaded || updating)
+            return;
+        ResetPage();
+        await RefreshAsync();
+    }
+    private async void TabChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (smokeMode || e.Source != ResultTabs || !IsLoaded || updating)
+            return;
+        ResetPage();
+        sort = "";
+        descending = false;
+        ConfigureColumns();
+        await RefreshAsync();
+    }
+    private async void SortChanged(object sender, DataGridSortingEventArgs e)
+    {
+        e.Handled = true;
+        sort = e.Column.SortMemberPath;
+        descending = e.Column.SortDirection != ListSortDirection.Descending && e.Column.SortDirection == ListSortDirection.Ascending;
+        foreach (var c in ResultsGrid.Columns)
+            c.SortDirection = null;
+        e.Column.SortDirection = descending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+        ResetPage();
+        await RefreshAsync();
+    }
+    private async void PreviousClick(object sender, RoutedEventArgs e)
+    {
+        if (page > 0)
+        {
+            page--;
+            request++;
+            await RefreshAsync();
+        }
+    }
+    private async void NextClick(object sender, RoutedEventArgs e)
+    {
+        if (((long)page + 1) * PageSize >= rowCount)
+            return;
+        if (ResultTabs.SelectedIndex == 3 && eventAnchor is null && LogGrid.ItemsSource is List<EventRow> rows)
+            eventAnchor = rows.FirstOrDefault()?.Sequence;
+        page++;
+        request++;
+        await RefreshAsync();
+    }
+    private async void LatestClick(object sender, RoutedEventArgs e)
+    {
+        ResetPage();
+        await RefreshAsync();
+    }
+    private void SetPreparing(bool value, string? message = null)
+    {
+        preparing = value;
+        StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = !value;
+        ExportButton.IsEnabled = !value && ResultTabs.SelectedIndex == 0 && rowCount > 0;
+        if (message is not null)
+            InputFeedback.Text = message;
+    }
+    private void InputChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!updating)
+            preparedImport = null;
+    }
+    private void ClearInputClick(object sender, RoutedEventArgs e)
+    {
+        if (preparing)
+            return;
+        preparedImport = null;
+        DomainInput.IsReadOnly = false;
+        DomainInput.Clear();
+        InputPanel.IsExpanded = true;
+        InputPanel.Header = "Input domain";
+        InputLabel.Text = "Tempel domain, atau impor file. Satu daftar menjadi satu pemeriksaan.";
+        InputFeedback.Text = "Belum ada daftar input.";
+        DomainInput.Focus();
     }
     private void ApplyImport(ImportResult parsed)
     {
         if (parsed.Domains.Count == 0)
-            throw new ArgumentException($"Tidak ditemukan domain valid ({parsed.Invalid.Count} tidak valid). Daftar sebelumnya tidak diubah.");
-        DomainInput.Text = string.Join('\n', parsed.Domains);
-        var batches = (parsed.Domains.Count + 999) / 1000;
-        InputFeedback.Text = $"{parsed.Domains.Count:N0} domain valid · {parsed.Duplicates:N0} duplikat dibuang · {parsed.Invalid.Count:N0} tidak valid" + (batches > 1 ? $" · akan dibagi menjadi {batches:N0} hunting" : "");
+            throw new ArgumentException($"Tidak ada domain valid ({parsed.Invalid.Count:N0} tidak valid). Daftar sebelumnya dipertahankan.");
+        updating = true;
+        preparedImport = parsed;
+        DomainInput.Text = string.Join('\n', parsed.Domains.Take(200));
+        DomainInput.IsReadOnly = true;
+        InputLabel.Text = $"Pratinjau {Math.Min(200, parsed.Domains.Count):N0} dari {parsed.Domains.Count:N0} domain; seluruh daftar akan diperiksa. Pilih Input baru untuk mengganti.";
+        InputFeedback.Text = $"{parsed.Domains.Count:N0} valid · {parsed.Duplicates:N0} duplikat dibuang · {parsed.Invalid.Count:N0} tidak valid · satu pemeriksaan, tanpa pecah per 1.000.";
+        InputPanel.Header = $"Input: {parsed.Domains.Count:N0} domain siap";
+        InputPanel.IsExpanded = true;
+        updating = false;
     }
     private async void ImportClick(object sender, RoutedEventArgs e)
     {
-        if (importing)
+        if (preparing)
             return;
         var dialog = new OpenFileDialog { Filter = "Daftar domain (*.csv;*.txt;*.tsv)|*.csv;*.txt;*.tsv|Semua file|*.*" };
         if (dialog.ShowDialog(this) != true)
             return;
-        importing = true;
-        StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = false;
-        InputFeedback.Text = "Membaca dan memisahkan domain…";
+        SetPreparing(true, "Membaca dan memisahkan domain…");
         try
         {
-            var parsed = await Task.Run(() =>
-            {
-                return Domains.Parse(File.ReadAllText(dialog.FileName), limit: null);
-            });
+            var work = Task.Run(() => Domains.Parse(File.ReadAllText(dialog.FileName)));
+            inputWork = work;
+            var parsed = await work;
             if (!closing)
                 ApplyImport(parsed);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            if (!closing)
-                InputFeedback.Text = ex is ArgumentException ? ex.Message : "File tidak dapat dibaca; daftar sebelumnya tidak diubah.";
-        }
-        finally
-        {
-            importing = false;
-            if (!closing)
-                StartButton.IsEnabled = ImportButton.IsEnabled = DomainInput.IsEnabled = true;
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { if (!closing) InputFeedback.Text = ex is ArgumentException ? ex.Message : "File tidak dapat dibaca; daftar sebelumnya dipertahankan."; }
+        finally { if (!closing) SetPreparing(false); }
     }
-    private void GenerateClick(object sender, RoutedEventArgs e)
+    private async void StartClick(object sender, RoutedEventArgs e)
     {
-        if (importing)
+        if (preparing)
             return;
+        var cached = preparedImport;
+        var text = DomainInput.Text;
+        SetPreparing(true, "Menyimpan seluruh daftar pemeriksaan…");
         try
         {
-            var parsed = Domains.Parse(string.Join('\n', Domains.Generate(Keywords.Text, Tlds.Text)));
-            DomainInput.Text = string.Join('\n', parsed.Domains);
-            InputFeedback.Text = $"{parsed.Domains.Count} domain dibuat · {parsed.Invalid.Count} kombinasi tidak valid";
+            var work = Task.Run(() => { var parsed = cached ?? Domains.Parse(text); if (parsed.Domains.Count == 0) throw new ArgumentException("Masukkan minimal satu domain valid."); return (Job: store.NewJob(parsed.Domains), Count: parsed.Domains.Count); });
+            inputWork = work;
+            var created = await work;
+            if (closing)
+                return;
+            scope = created.Job;
+            lastJobs = "";
+            ResetPage();
+            InputFeedback.Text = $"{created.Count:N0} domain dalam satu pemeriksaan.";
+            InputPanel.IsExpanded = false;
+            engine.Start();
         }
-        catch (ArgumentException ex) { InputFeedback.Text = ex.Message; }
+        catch (Exception ex) when (ex is ArgumentException or Microsoft.Data.Sqlite.SqliteException or IOException) { if (!closing) InputFeedback.Text = ex is ArgumentException ? ex.Message : "Daftar belum dapat disimpan. Tidak ada pemeriksaan parsial dibuat."; }
+        finally { if (!closing) { SetPreparing(false); await RefreshAsync(); } }
+    }
+    private async void GenerateClick(object sender, RoutedEventArgs e)
+    {
+        if (preparing)
+            return;
+        var keywords = Keywords.Text;
+        var tlds = Tlds.Text;
+        SetPreparing(true, "Membuat daftar…");
+        try
+        {
+            var work = Task.Run(() => Domains.Parse(string.Join('\n', Domains.Generate(keywords, tlds))));
+            inputWork = work;
+            var parsed = await work;
+            if (!closing)
+                ApplyImport(parsed);
+        }
+        catch (ArgumentException ex) { if (!closing) InputFeedback.Text = ex.Message; }
+        finally { if (!closing) SetPreparing(false); }
     }
     private void PauseClick(object sender, RoutedEventArgs e)
     {
         engine.Pause();
-        ProgressText.Text = "Menjeda dan menyimpan progres…";
+        SessionStatus.Text = "Menjeda; menunggu worker berhenti dan menyimpan hasil…";
     }
-    private void ResumeClick(object sender, RoutedEventArgs e)
+    private async void ResumeClick(object sender, RoutedEventArgs e)
     {
-        if (CurrentJob is { } id && !engine.Running)
+        if (engine.Running || preparing)
+            return;
+        store.Resume(scope);
+        engine.Start();
+        request++;
+        await RefreshAsync();
+    }
+    private async void RetryClick(object sender, RoutedEventArgs e)
+    {
+        if (engine.Running || preparing)
+            return;
+        SetPreparing(true, "Menyiapkan sumber gagal untuk dicoba ulang…");
+        try
         {
-            store.State(id, "queued");
-            engine.Start();
-            Refresh();
+            var selected = scope;
+            var work = Task.Run(() => store.RetryFailed(selected));
+            inputWork = work;
+            await work;
+            if (!closing)
+                engine.Start();
         }
+        finally { if (!closing) { SetPreparing(false); request++; await RefreshAsync(); } }
     }
-    private void RetryClick(object sender, RoutedEventArgs e)
+    private async void ExportClick(object sender, RoutedEventArgs e)
     {
-        if (CurrentJob is { } id && !engine.Running)
-        {
-            store.RetryFailed(id);
-            engine.Start();
-            Refresh();
-        }
-    }
-    private void ExportClick(object sender, RoutedEventArgs e)
-    {
-        var rows = view?.Cast<Result>().ToArray() ?? [];
-        if (ResultTabs.SelectedIndex != 0 || rows.Length == 0)
+        if (preparing || ResultTabs.SelectedIndex != 0 || rowCount == 0)
             return;
         var dialog = new SaveFileDialog { Filter = "CSV (*.csv)|*.csv", FileName = "MozChecker-available.csv" };
         if (dialog.ShowDialog(this) != true)
             return;
+        var selected = scope;
+        var filter = QueryFilter();
+        var selectedSort = sort;
+        var desc = descending;
+        SetPreparing(true, "Mengekspor seluruh hasil sesuai filter, semua halaman…");
         try
         {
-            CsvExport.Save(dialog.FileName, rows);
-            ProgressText.Text = $"{rows.Length} domain diekspor.";
+            var work = Task.Run(() => CsvExport.Save(dialog.FileName, store.ExportAvailable(selected, filter, selectedSort, desc)));
+            inputWork = work;
+            await work;
+            if (!closing)
+                InputFeedback.Text = "Ekspor seluruh hasil sesuai filter selesai.";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, "CSV belum dapat disimpan. Periksa folder dan tutup file yang sedang digunakan.", "Ekspor"); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException) { if (!closing) MessageBox.Show(this, "CSV belum dapat disimpan. Periksa folder tujuan.", "Ekspor"); }
+        finally { if (!closing) { SetPreparing(false); await RefreshAsync(); } }
     }
     private void EvidenceClick(object sender, RoutedEventArgs e)
     {
-        if (ResultsGrid.SelectedItem is Result result)
-            new EvidenceWindow(result) { Owner = this }.ShowDialog();
+        if (ResultsGrid.SelectedItem is Result r)
+            new EvidenceWindow(r) { Owner = this }.ShowDialog();
     }
     private void GridKeyDown(object sender, KeyEventArgs e)
     {
@@ -251,49 +418,70 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
     }
-    private void FilterClick(object sender, RoutedEventArgs e)
+    private async void FilterClick(object sender, RoutedEventArgs e)
     {
         var dialog = new FilterWindow(filters) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             filters = dialog.Values;
-            FilterButton.Content = filters.Active ? "Filter aktif" : "Filter";
-            view?.Refresh();
-            UpdateEmpty();
+            FilterButton.Content = filters.Active ? "Filter aktif…" : "Filter…";
+            ResetPage();
+            await RefreshAsync();
         }
     }
-    private void ResetClick(object sender, RoutedEventArgs e)
+    private void ResetFilters()
     {
+        updating = true;
         filters = new();
-        FilterButton.Content = "Filter";
         Search.Clear();
-        view?.Refresh();
-        UpdateEmpty();
+        FilterButton.Content = "Filter…";
+        updating = false;
+        ResetPage();
     }
-    private void SettingsClick(object sender, RoutedEventArgs e)
+    private async void ResetClick(object sender, RoutedEventArgs e)
     {
-        if (engine.Running)
+        ResetFilters();
+        await RefreshAsync();
+    }
+    private async void SettingsClick(object sender, RoutedEventArgs e)
+    {
+        if (engine.Running || preparing)
         {
-            MessageBox.Show(this, "Jeda hunting sebelum mengubah kunci atau aturan.", "Pengaturan");
+            MessageBox.Show(this, "Jeda pemeriksaan sebelum mengubah pengaturan.", "Pengaturan");
             return;
         }
-        var dialog = new SettingsWindow(store) { Owner = this };
-        if (dialog.ShowDialog() == true)
+        if (new SettingsWindow(store) { Owner = this }.ShowDialog() == true)
         {
             try
             {
                 engine = NewEngine(CredentialVault.Load());
-                Refresh();
+                await RefreshAsync();
             }
-            catch (System.ComponentModel.Win32Exception) { MessageBox.Show(this, "Credential Manager belum dapat dibaca.", "Pengaturan"); }
+            catch (System.ComponentModel.Win32Exception) { MessageBox.Show(this, "Credential Manager belum dapat dibaca."); }
         }
     }
     public async Task StopAsync()
     {
         timer.Stop();
         engine.Pause();
+        if (inputWork is { } input)
+        {
+            try
+            {
+                await input;
+            }
+            catch { }
+        }
         if (engine.Completion is { } task)
             await task;
+        if (refreshWork is { } refresh)
+        {
+            try
+            {
+                await refresh;
+            }
+            catch { }
+        }
     }
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -311,43 +499,44 @@ public partial class MainWindow : Window
     }
     internal void VerifySmoke()
     {
-        if (Domains.Normalize("https://www.bücher.de/path") != "xn--bcher-kva.de" || ResultsGrid.Columns.Count != 8 || ExportButton.IsEnabled)
-            throw new InvalidOperationException("Empty workspace smoke failed");
-        ApplyImport(Domains.Parse("score;Domain Name\r\n90;https://www.google.com/path\r\n80;GOOGLE.com\r\n70;co.id", limit: null));
-        if (DomainInput.Text != "google.com" || !InputFeedback.Text.Contains("1 duplikat dibuang") || !InputFeedback.Text.Contains("1 tidak valid"))
-            throw new InvalidOperationException("Immediate CSV import smoke failed");
-        ApplyImport(Domains.Parse(string.Join('\n', Enumerable.Range(0, 1001).Select(i => $"import{i}.com")), limit: null));
-        if (DomainInput.LineCount != 1001 || !InputFeedback.Text.Contains("2 hunting"))
-            throw new InvalidOperationException("Large CSV import smoke failed");
-        DomainInput.Clear();
-        InputFeedback.Text = "Daftar besar otomatis dibagi per 1.000 domain.";
-        var job = store.NewJob(["google.com", "sample-example.com"]);
-        var registered = new Result { Domain = "google.com", Status = "registered", Stage = "done", AvailabilityAt = JsonData.Now() };
-        var available = new Result { Domain = "sample-example.com", Status = "available", Stage = "done", AvailabilityAt = JsonData.Now(), History = "no_history" };
-        store.Save(job, registered);
-        store.Save(job, available);
-        Refresh();
-        Jobs.SelectedItem = ((IEnumerable<Job>)Jobs.ItemsSource).Single(x => x.Id == job);
-        Refresh(true);
-        if (view?.Cast<Result>().Single().Domain != available.Domain || !Log.Text.Contains("google.com · registered") || !ExportButton.IsEnabled)
-            throw new InvalidOperationException("Available-only smoke failed");
-        Search.Text = "absent";
-        if (view!.Cast<Result>().Any() || ExportButton.IsEnabled)
-            throw new InvalidOperationException("Search smoke failed");
-        ResetClick(this, new());
-        ResultTabs.SelectedIndex = 1;
-        if (ExportButton.IsEnabled)
-            throw new InvalidOperationException("Log export smoke failed");
+        timer.Stop();
+        if (Domains.Normalize("https://www.bücher.de/path") != "xn--bcher-kva.de" || ResultsGrid.Columns.Count != 8)
+            throw new InvalidOperationException("Empty workspace failed");
+        ApplyImport(Domains.Parse("score;Domain Name\n90;https://www.google.com/path\n80;GOOGLE.com\n70;co.id"));
+        if (preparedImport?.Domains.Single() != "google.com" || !InputFeedback.Text.Contains("1 duplikat"))
+            throw new InvalidOperationException("Immediate import failed");
+        ApplyImport(Domains.Parse(string.Join('\n', Enumerable.Range(0, 2501).Select(i => $"import{i}.com"))));
+        if (preparedImport?.Domains.Count != 2501 || DomainInput.LineCount > 200 || !InputLabel.Text.Contains("2,501") && !InputLabel.Text.Contains("2.501"))
+            throw new InvalidOperationException("Large-list preview failed");
+        var job = store.NewJob(preparedImport.Domains);
+        if (store.Counts(job).Total != 2501)
+            throw new InvalidOperationException("Single full-list job failed");
+        store.State(job, "running");
+        store.Save(job, new Result { Domain = "import0.com", Status = "registered", Stage = "done", AvailabilityAt = JsonData.Now() });
+        store.Save(job, new Result { Domain = "import1.com", Status = "available", Stage = "done", AvailabilityAt = JsonData.Now(), History = "valid" });
+        scope = null;
         ResultTabs.SelectedIndex = 0;
-        // Screenshots show the unpopulated workspace; test fixtures live only in this temporary DB.
-        ResultsGrid.ItemsSource = null;
-        results = [];
-        view = null;
-        Jobs.ItemsSource = null;
-        Log.Text = "Belum ada pemeriksaan.";
-        AvailableStat.Text = CheckedStat.Text = HistoryStat.Text = RegisteredStat.Text = "0";
-        Progress.Value = 0;
-        ProgressText.Text = "Workspace siap. Masukkan daftar domain untuk mulai.";
-        UpdateEmpty();
+        ConfigureColumns();
+        Render(new(store.Jobs(), store.Counts(null), store.Page(null, 0, new()), null));
+        if (((List<Result>)ResultsGrid.ItemsSource).Single().Domain != "import1.com" || !ExportButton.IsEnabled || !ProgressText.Text.Contains("2,501") && !ProgressText.Text.Contains("2.501"))
+            throw new InvalidOperationException("Aggregate available results failed");
+        Search.Text = "absent";
+        Render(new(store.Jobs(), store.Counts(null), store.Page(null, 0, QueryFilter()), null));
+        if (ExportButton.IsEnabled)
+            throw new InvalidOperationException("Search/export failed");
+        ResetFilters();
+        ResultTabs.SelectedIndex = 3;
+        var events = store.Events(null);
+        Render(new(store.Jobs(), store.Counts(null), null, events));
+        if (events.Rows.Any(r => r.Stage == "queued") || !events.Rows.Any(r => r.Status == "registered") || ExportButton.IsEnabled)
+            throw new InvalidOperationException("Timestamped event log failed");
+        // Only the empty workspace is captured; fixtures stay in this temporary database.
+        scope = "empty";
+        ResultTabs.SelectedIndex = 0;
+        ConfigureColumns();
+        ClearInputClick(this, new());
+        InputPanel.Header = "Input domain";
+        lastJobs = "";
+        Render(new([], new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), new([], 0), null));
     }
 }

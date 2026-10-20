@@ -11,11 +11,14 @@ public partial class App : Application
 {
     private FileStream? instanceLock;
     private Store? store;
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var smoke = e.Args.Contains("--smoke");
         var smokeDirectory = smoke ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MozChecker-smoke-" + Guid.NewGuid().ToString("N")) : null;
+        Window? loading = null;
+        var loadingClosed = false;
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         try
         {
             var directory = smokeDirectory ?? Store.DataDirectory;
@@ -24,7 +27,18 @@ public partial class App : Application
             instanceLock = new FileStream(System.IO.Path.Combine(directory, "desktop-dotnet.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             if (!smoke && File.Exists(System.IO.Path.Combine(directory, "desktop.lock")))
                 throw new IOException("Tutup aplikasi Python lama sebelum membuka versi .NET; jika sudah ditutup, periksa sisa desktop.lock.");
-            store = new Store(System.IO.Path.Combine(directory, "checker.sqlite3"));
+            if (!smoke)
+            {
+                loading = new Window { Title = "Moz Checker", Width = 460, Height = 130, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = new System.Windows.Controls.TextBlock { Text = "Membuka data lokal dan memperbarui indeks…", Margin = new Thickness(24), VerticalAlignment = VerticalAlignment.Center } };
+                loading.Closed += (_, _) => loadingClosed = true;
+                loading.Show();
+            }
+            store = await Task.Run(() => new Store(System.IO.Path.Combine(directory, "checker.sqlite3")));
+            if (loadingClosed)
+            {
+                Shutdown(0);
+                return;
+            }
             var keys = new ApiKeys();
             var vaultWarning = "";
             if (!smoke)
@@ -38,6 +52,8 @@ public partial class App : Application
             var window = new MainWindow(store, keys, smoke);
             MainWindow = window;
             window.Show();
+            loading?.Close();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             if (vaultWarning.Length > 0)
                 MessageBox.Show(window, vaultWarning, "API key");
             if (smoke)
@@ -51,7 +67,7 @@ public partial class App : Application
                         File.WriteAllText(System.IO.Path.Combine(directory, "smoke-report.json"), JsonData.Write(new
                         {
                             Ui = "WPF",
-                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states", "immediate CSV parsing", "large-list import preview" },
+                            Checks = new[] { "IDN/PSL", "eight columns", "available-only results", "registered log", "search", "reset", "CSV button states", "immediate CSV parsing", "large-list import preview", "single full-list session", "aggregate progress", "queue/event separation", "persistent timestamped log" },
                             Status = "passed"
                         }));
                         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

@@ -53,7 +53,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                     store.State(job.Id, "completed");
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { store.State(job.Id, "paused"); break; }
-                catch (Exception ex) { Failure = $"Worker berhenti ({ex.GetType().Name}); hunting dijeda."; store.State(job.Id, "paused"); break; }
+                catch (Exception ex) { Failure = $"Worker berhenti ({ex.GetType().Name}); pemeriksaan dijeda."; store.State(job.Id, "paused"); break; }
                 Changed?.Invoke();
             }
         }
@@ -80,7 +80,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
         {
             try
             {
-                await Parallel.ForEachAsync(store.Results(job).Where(x => x.Stage != "done"), new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = token }, async (r, t) =>
+                await Parallel.ForEachAsync(store.PendingResults(job), new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = token }, async (r, t) =>
                 {
                     r.Stage = "availability";
                     Emit(job, r);
@@ -183,7 +183,12 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
             {
                 // Archive work can take hours. Refresh availability before any paid request.
                 if (!JsonData.Fresh(r.AvailabilityAt, 900))
+                {
+                    r.Stage = "availability";
+                    Emit(job, r);
                     await providers.AvailabilityAsync(r, true, ct);
+                    Emit(job, r);
+                }
                 if (r.Status != "available" || !JsonData.Fresh(r.AvailabilityAt, 900))
                     r.MozState = "not_available";
                 else if (!store.ReserveRow(settings.Period, settings.MozBudget, settings.MozReserve))
@@ -191,6 +196,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                 else
                 {
                     r.MozState = "reserved";
+                    r.Stage = "moz";
                     Emit(job, r);
                     await providers.MozAsync(r, ct);
                     r.Errors.Remove("moz");

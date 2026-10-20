@@ -1,49 +1,14 @@
-# Moz Checker — desktop design system
+# Moz Checker — Windows desktop workspace (0.4.0)
 
-## Scope and provenance
+The user explicitly rejected the previous dark mint dashboard, slogan, rounded cards and sidebar. This direction replaces that design for the C# desktop. Legacy Qt/Python styling is not the source of truth for WPF.
 
-Native Windows desktop UI built with PySide6/Qt Widgets; no web framework, external font service, or UI server. Reviewed using [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill).
-
-The refined `analytics dashboard productivity` design-system query returned the **Data-Dense Dashboard** style (data tables, KPI cards, compact grids, clear filtering). That style and stack-independent keyboard/contrast/form guidance fit this product. The same query's Enterprise Gateway/marketing pattern did not fit and was discarded. There is no Qt Widgets stack in the skill's stack catalog; layout and implementation below are project-specific desktop decisions, not purported Qt search results.
-
-## Visual direction
-
-- Dark research workspace with a permanent input sidebar and a larger results area.
-- Mint marks the primary action and available candidates; all states also have text, not color alone.
-- Segoe UI on Windows with local sans-serif fallbacks. Monospace is limited to domain input, technical evidence, and logs. No remote font downloads.
-- Semantic colors, original local SVG line icons, consistent 1.7 stroke, 6/12px corner radii and 4/8px spacing rhythm. See `src/moz_checker/presentation.py` for actual tokens.
-- No decorative animation. Focus, hover, press, and disabled states have visible feedback without changing control bounds.
-
-## Information hierarchy
-
-1. Sidebar: input/import or keyword generator, one primary hunting action, local Moz quota.
-2. Main header: workspace title and export.
-3. Counters: Available, Sudah diperiksa, Riwayat lolos, Registered. These are derived from real saved results, never seeded demo numbers.
-4. Selected hunting, progress, and job controls.
-5. Available-only table with search and filter dialog; separate log for all outcomes.
-6. Evidence on request in a separate dialog, so it does not consume table height. Dates/registrar and worker details are in this evidence view; authority metrics appear first in the table.
-
-## Interaction
-
-- Existing SQLite files and pipeline semantics remain compatible.
-- Registered, redemption, pending delete and unknown never enter the shortlist or results CSV.
-- Empty states distinguish a new workspace, no available candidates, and no filter matches.
-- Search is case-insensitive. Reset clears the search and all filters. Active advanced filters show a count.
-- Filter and evidence dialogs can be closed with Escape. API settings separate keys from hunting rules and allow scrolling at smaller heights.
-- Ctrl+Enter: start/queue; Ctrl+O: import; Ctrl+F: focus shortlist search; Ctrl+comma: settings.
-- Export is disabled on the log tab and when there are no visible results. Job actions reflect the selected hunting's state.
-- Repeated background refreshes preserve the table and selection when results did not change.
-
-## Size and accessibility checks
-
-- Default workspace 1440×900 logical pixels; minimum 1040×700. Desktop scope; phone breakpoints from the skill are not applicable.
-- Under 800px height, hide secondary captions/icon, compact spacing, and shorten the input area; keep the primary action in view. Sidebar and settings can scroll instead of clipping controls.
-- Visible field labels, accessible names for controls and contextual stat cards, full native keyboard interaction, text descriptions of all states.
-- Contrast measured for primary, muted, accent, error, and blue text against the relevant dark surfaces; target ≥4.5:1 for text. No claim of formal screen-reader certification or manual high-DPI Windows validation.
-- Preview images with populated rows must be labeled simulated and use a temporary database. Never seed sample domains/metrics into the user's application data.
-
-## WPF migration (0.3.0)
-
-Visual direction and information hierarchy above carry over to native WPF. `dotnet/MozChecker.Desktop/App.xaml` defines semantic brushes and control states. The verified UI/UX Pro Max WPF search recommends native keyboard navigation and proportional Grid layout; the implementation uses both, with virtualized DataGrid rows/columns. Labels and automation names accompany fields. Native combo boxes retain platform popup semantics. The minimum desktop size remains 1040×700; sidebar and dialogs scroll. Mobile safe-area/phone checks are outside this Windows desktop scope. No decorative motion is introduced. Native Windows render and smoke checks are recorded in CI, with screen-reader and high-DPI validation still manual.
-
-WPF contrast measurements: primary text 14.52:1 or higher and secondary text 8.30:1 or higher against the three workspace surfaces. The control-border token is #5E7B6F (minimum 3.48:1 against those surfaces); keyboard focus uses the mint accent. Disabled controls are exempt from the active-control contrast threshold. These are token measurements, not screen-reader or Windows high-contrast certification.
+- Use the standard light Windows controls, Segoe UI 13, white data grid, gray toolbar and blue system selection. No hero text, metric cards, decorative branding or custom animation.
+- Top toolbar: import, input reset, start, pause, resume, retry and settings. Input collapses after starting; the table receives the available window area.
+- One imported list creates one examination, without a 1,000-domain split or a file-size cap. Large input shows an explicitly labeled 200-domain preview while retaining the entire parsed list for start.
+- Scope selector defaults to all examinations, including the previous version's split jobs. Progress is total/done/pending/actually active within the selected scope. Actual running job IDs and session-state counts are stated separately.
+- Four views: Available, Other results, Queue/in progress, Event log. Pending rows never masquerade as completed results or events.
+- Events are persisted in SQLite with sequence number, UTC timestamp rendered in local computer time, examination, domain, stage, status and message. Newest first. Older pages are anchored; Terbaru follows the live stream again. Old result timestamps are not fabricated into events during migration.
+- Main grids are virtualized and read 200 records per page. Every page shows its range and total. This is presentation paging, not a domain-processing limit. Search/filter/sort apply across the entire selected scope, and export streams all matching available results across all pages.
+- Counters are maintained in SQLite, and background workers read pending records in small cursor pages. Neither UI refresh nor engine startup deserializes a half-million-record result list.
+- Native focus rings, labeled controls, keyboard shortcuts and standard dialogs. The verified UI/UX Pro Max WPF guidance supports native keyboard navigation, proportional Grid layout and virtualization; it does not prescribe a marketing dashboard.
+- API settings/evidence use the same light native resources. Primary text #202020 and muted text #555555 have sufficient contrast against the white/light gray surfaces. Do not claim high-DPI/screen-reader certification from runner screenshots.

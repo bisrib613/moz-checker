@@ -44,7 +44,7 @@ public sealed class CoreTests : IDisposable
         Assert.Equal(new[] { "google.com" }, r.Domains);
         Assert.Equal(1, r.Duplicates);
         Assert.Single(r.Invalid);
-        Assert.Throws<ArgumentException>(() => Domains.Parse(string.Join('\n', Enumerable.Range(0, 1001).Select(i => $"d{i}.com"))));
+        Assert.Equal(1001, Domains.Parse(string.Join('\n', Enumerable.Range(0, 1001).Select(i => $"d{i}.com"))).Domains.Count);
         Assert.Throws<ArgumentException>(() => Domains.Parse("\"google.com"));
     }
     [Theory]
@@ -85,8 +85,8 @@ public sealed class CoreTests : IDisposable
         Assert.Equal(1, imported.Duplicates);
         Assert.Single(imported.Invalid);
         var jobs = store.NewJobs(imported.Domains);
-        Assert.Equal(3, jobs.Count);
-        Assert.Equal(new[] { 1000, 1000, 501 }, jobs.Select(id => store.Results(id).Count));
+        Assert.Single(jobs);
+        Assert.Equal(new[] { 2501 }, jobs.Select(id => store.Results(id).Count));
         Assert.Equal(imported.Domains, jobs.SelectMany(store.Results).Select(r => r.Domain));
         Assert.All(store.Jobs(), j => Assert.Equal("queued", j.State));
     }
@@ -316,6 +316,21 @@ public sealed class CoreTests : IDisposable
         await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal("completed", store.Jobs().Single().State);
         Assert.Empty(fake.MozDomains);
+    }
+    [Fact]
+    public async Task OneSessionProcessesPastTheOldThousandDomainBoundary()
+    {
+        using var store = Open();
+        var job = store.NewJob(Enumerable.Range(0, 2501).Select(i => $"beyond{i}.com"));
+        var engine = new Engine(store, new(), new FakeProviders());
+        engine.Start();
+        await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(180));
+        Assert.Single(store.Jobs());
+        Assert.Equal("completed", store.Jobs().Single().State);
+        Assert.Equal(2501, store.Counts(job).Done);
+        Assert.Equal(0, store.Counts(job).Pending);
+        Assert.Equal(2501, store.Page(job, 0, new()).Total);
+        Assert.Empty(store.PendingResults(job));
     }
     [Fact]
     public async Task ThousandDomainBoundedPipelineCompletesWithoutDeadlock()

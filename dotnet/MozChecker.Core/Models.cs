@@ -61,6 +61,9 @@ public sealed class Result
     public string MozAt { get; set; } = "";
     public string MozState { get; set; } = "";
     public Dictionary<string, string> Errors { get; set; } = [];
+    [JsonIgnore] public string JobId { get; set; } = "";
+    [JsonIgnore] public string WorkState { get; set; } = "";
+    [JsonIgnore] public string StatusText => Stage == "queued" && AvailabilityAt.Length == 0 ? "Belum diperiksa" : Status;
     [JsonIgnore] public bool Ready => Status == "available" && JsonData.Fresh(AvailabilityAt, 900) && History is "valid" or "no_history";
     [JsonIgnore] public string Readiness => Ready ? "Kandidat · cek registrar" : Status == "available" && !JsonData.Fresh(AvailabilityAt, 900) ? "Basi · periksa ulang" : "Belum lolos";
 }
@@ -228,7 +231,7 @@ public static partial class Domains
         }
         catch (ArgumentException) { return false; }
     }
-    public static ImportResult Parse(string text, int? limit = 1000)
+    public static ImportResult Parse(string text, int? limit = null)
     {
         text = text.TrimStart('\uFEFF', '\r', '\n');
         char separator;
@@ -280,8 +283,6 @@ public static partial class Domains
     {
         var words = Regex.Split(keywords.Trim(), @"[,;\s]+").Where(x => x.Length > 0).ToArray();
         var suffixes = Regex.Split(tlds.Trim(), @"[,;\s]+").Where(x => x.Length > 0).ToArray();
-        if ((long)words.Length * suffixes.Length > 1000)
-            throw new ArgumentException("Maksimal 1.000 kombinasi per hunting.");
         return words.SelectMany(w => suffixes.Select(t => $"{w}.{t.TrimStart('.')}"));
     }
 }
@@ -297,7 +298,7 @@ public static class CsvExport
     public static void Save(string path, IEnumerable<Result> results)
     {
         using var writer = new StreamWriter(path, false, new UTF8Encoding(true));
-        var properties = typeof(Result).GetProperties().Where(x => x.Name != nameof(Result.Readiness)).ToArray();
+        var properties = typeof(Result).GetProperties().Where(x => x.Name is not (nameof(Result.Readiness) or nameof(Result.WorkState) or nameof(Result.StatusText))).ToArray();
         writer.WriteLine(string.Join(',', properties.Select(x => Cell(JsonNamingPolicy.SnakeCaseLower.ConvertName(x.Name)))) + ",authority_sources");
         foreach (var r in results.Where(x => x.Status == "available"))
             writer.WriteLine(string.Join(',', properties.Select(p => Cell(p.GetValue(r) is var v && v is not null ? v is string s ? s : JsonData.Write(v) : ""))) + ",\"OPR; Moz DA; Moz PA; Moz Spam Score\"");

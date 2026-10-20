@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace MozChecker.Core;
 
-public sealed class Store : IDisposable
+public sealed partial class Store : IDisposable
 {
     private readonly SqliteConnection db;
     private readonly object sync = new();
@@ -27,6 +27,7 @@ public sealed class Store : IDisposable
         }
         Execute("PRAGMA journal_mode=WAL;");
         Execute("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, created TEXT, state TEXT); CREATE TABLE IF NOT EXISTS results(job TEXT, domain TEXT, ordinal INTEGER, data TEXT, PRIMARY KEY(job, domain)); CREATE TABLE IF NOT EXISTS cache(source TEXT, domain TEXT, checked TEXT, data TEXT, PRIMARY KEY(source,domain)); CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT); CREATE TABLE IF NOT EXISTS quota(period TEXT PRIMARY KEY, used INTEGER NOT NULL);");
+        InitializeWorkspace();
         // An interrupted job is never silently restarted on application launch.
         Execute("UPDATE jobs SET state='paused' WHERE state IN ('running','queued')");
     }
@@ -69,34 +70,39 @@ public sealed class Store : IDisposable
             tx.Commit();
         }
     }
-    public string NewJob(IEnumerable<string> domains)
+    public string NewJob(IEnumerable<string> domains, CancellationToken ct = default)
     {
-        var list = domains.Distinct().ToArray();
-        if (list.Length is 0 or > 1000)
-            throw new ArgumentException("Masukkan 1–1.000 domain.");
-        return NewJobs(list).Single();
-    }
-    public List<string> NewJobs(IEnumerable<string> domains)
-    {
-        var list = domains.Distinct().ToArray();
-        if (list.Length == 0)
-            throw new ArgumentException("Masukkan minimal satu domain.");
-        var ids = new List<string>();
+        var id = Guid.NewGuid().ToString("N");
         lock (sync)
         {
-            // Save the full imported list atomically before starting any worker.
             using var tx = db.BeginTransaction();
-            foreach (var chunk in list.Chunk(1000))
+            Execute("INSERT INTO jobs VALUES ($p0,$p1,'queued')", id, JsonData.Now());
+            using var insert = Command("INSERT INTO results VALUES ($p0,$p1,$p2,$p3)", id, "", 0, "");
+            insert.Prepare();
+            var seen = new HashSet<string>();
+            var ordinal = 0;
+            foreach (var domain in domains)
             {
-                var id = Guid.NewGuid().ToString("N");
-                ids.Add(id);
-                Execute("INSERT INTO jobs VALUES ($p0,$p1,'queued')", id, JsonData.Now());
-                for (int i = 0; i < chunk.Length; i++)
-                    Execute("INSERT INTO results VALUES ($p0,$p1,$p2,$p3)", id, chunk[i], i, JsonData.Write(new Result { Domain = chunk[i] }));
+                ct.ThrowIfCancellationRequested();
+                if (!seen.Add(domain))
+                    continue;
+                insert.Parameters[1].Value = domain;
+                insert.Parameters[2].Value = ordinal++;
+                insert.Parameters[3].Value = JsonData.Write(new Result { Domain = domain });
+                insert.ExecuteNonQuery();
             }
+            if (ordinal == 0)
+                throw new ArgumentException("Masukkan minimal satu domain.");
             tx.Commit();
         }
-        return ids;
+        return id;
+    }
+    // Retained API name for compatibility; one imported list is one job, without chunks.
+    public List<string> NewJobs(IEnumerable<string> domains) => [NewJob(domains)];
+    public T ReadConsistent<T>(Func<Store, T> read)
+    {
+        lock (sync)
+            return read(this);
     }
     public List<Job> Jobs()
     {
@@ -113,7 +119,15 @@ public sealed class Store : IDisposable
     public void State(string job, string state)
     {
         lock (sync)
+        {
+            using var current = Command("SELECT state FROM jobs WHERE id=$p0", job);
+            var previous = current.ExecuteScalar()?.ToString();
+            using var tx = db.BeginTransaction();
             Execute("UPDATE jobs SET state=$p0 WHERE id=$p1", state, job);
+            if (previous != state && state is "running" or "paused" or "completed")
+                AddEvent(job, "", "session", state, state == "running" ? "Pemeriksaan dimulai / dilanjutkan" : state == "paused" ? "Pemeriksaan dijeda" : "Pemeriksaan selesai");
+            tx.Commit();
+        }
     }
     public List<Result> Results(string job)
     {
@@ -130,7 +144,23 @@ public sealed class Store : IDisposable
     public void Save(string job, Result result)
     {
         lock (sync)
-            Execute("UPDATE results SET data=$p0 WHERE job=$p1 AND domain=$p2", JsonData.Write(result), job, result.Domain);
+        {
+            var data = JsonData.Write(result);
+            using var read = Command("SELECT data FROM results WHERE job=$p0 AND domain=$p1", job, result.Domain);
+            var previous = read.ExecuteScalar()?.ToString();
+            if (previous is null || previous == data)
+                return;
+            using var tx = db.BeginTransaction();
+            Execute("UPDATE results SET data=$p0 WHERE job=$p1 AND domain=$p2", data, job, result.Domain);
+            if (result.Stage != "queued")
+            {
+                using var old = JsonDocument.Parse(previous);
+                var previousStage = old.RootElement.GetProperty("stage").GetString() ?? "";
+                var status = (result.Stage == "availability" && previousStage != "availability") || result.Stage == "history" ? "started" : result.Stage == "moz" ? "reserved" : result.Status;
+                AddEvent(job, result.Domain, result.Stage, status, EventMessage(result, previousStage));
+            }
+            tx.Commit();
+        }
     }
     public T? CacheGet<T>(string source, string domain, int ttl)
     {
@@ -169,16 +199,14 @@ public sealed class Store : IDisposable
             return true;
         }
     }
-    public void RetryFailed(string job)
+    public void RetryFailed(string? job)
     {
         lock (sync)
         {
-            foreach (var r in Results(job).Where(x => x.Errors.Count > 0 || x.History == "unchecked" || x.Status == "unknown"))
-            {
-                r.Stage = "queued";
-                Save(job, r);
-            }
-            State(job, "queued");
+            using var tx = db.BeginTransaction();
+            Execute("UPDATE results SET data=json_set(data,'$.stage','queued') WHERE ($p0='' OR job=$p0) AND json_extract(data,'$.stage')='done' AND (json_extract(data,'$.history')='unchecked' OR json_extract(data,'$.status')='unknown' OR json_extract(data,'$.errors')<>'{}')", job ?? "");
+            Execute("UPDATE jobs SET state='queued' WHERE ($p0='' OR id=$p0) AND EXISTS(SELECT 1 FROM results WHERE job=jobs.id AND json_extract(data,'$.stage')<>'done')", job ?? "");
+            tx.Commit();
         }
     }
     public void Dispose()
