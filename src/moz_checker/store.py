@@ -103,7 +103,9 @@ class Store:
             return True
 
     def close(self):
-        self.db.close()
+        # sqlite3_close must never race a statement on this shared connection.
+        with self.lock:
+            self.db.close()
 
 
 def export_csv(path, results):

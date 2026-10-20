@@ -35,9 +35,16 @@ class FakeProviders:
 
 def run(engine):
     engine.start()
-    engine.thread.join(10)
-    assert not engine.alive()
-    assert not engine.failure
+    try:
+        # Windows disk flushes for 1,000 persistent results can exceed 10 seconds.
+        engine.thread.join(60)
+        assert not engine.alive()
+        assert not engine.failure
+    finally:
+        if engine.alive():
+            engine.pause()
+            engine.thread.join(30)
+        engine.close()
 
 
 def test_funnel_errors_quota_and_multiple_jobs(store):

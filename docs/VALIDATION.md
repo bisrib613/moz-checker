@@ -5,7 +5,7 @@ Dibangun dari PRD pengguna pada 20 Oktober 2026. Platform cloud: Python 3.12, Li
 ## Terverifikasi
 
 - Instalasi dependency menggunakan `uv sync --frozen --extra dev` dan `uv.lock`.
-- 51 tes otomatis offline: normalisasi/IDN/Public Suffix List (tidak menyatakan subdomain available), impor/limit 1.000 domain, bukti RDAP+DNS, batching/cache OPR, sampling/temuan arsip, error/retry, kuota lintas koneksi database, pause/resume, pipeline 1.000 domain simulasi, CSV, filter, dan dialog pengaturan.
+- 52 tes otomatis offline: normalisasi/IDN/Public Suffix List (tidak menyatakan subdomain available), impor/limit 1.000 domain, bukti RDAP+DNS, batching/cache OPR, sampling/temuan arsip, error/retry, kuota lintas koneksi database, pause/resume, pipeline 1.000 domain simulasi, CSV, filter, dan dialog pengaturan.
 - Ruff, startup/render Qt offscreen, inisialisasi SQLite, dan shutdown.
 - Build sdist/wheel dan executable Linux dengan PyInstaller; executable Linux lolos `--smoke`. Ini tidak membuktikan executable Windows.
 - Bootstrap IANA berhasil diambil lewat HTTPX dengan `Accept-Encoding: identity`. Respons terkompresi proxy sempat gagal decoding; permintaan tanpa kompresi mengatasinya tanpa melemahkan TLS verification.

@@ -80,3 +80,23 @@ def test_quota_limit_shared_between_database_connections(store):
     assert not second.reserve_row('shared', 2, 1)
     assert second.used('shared') == 1
     second.close()
+
+
+def test_close_waits_for_database_operation_lock(store):
+    import threading
+    entered, closed = threading.Event(), threading.Event()
+
+    def close_database():
+        entered.set()
+        store.close()
+        closed.set()
+
+    with store.lock:
+        closer = threading.Thread(target=close_database)
+        closer.start()
+        assert entered.wait(2)
+        assert not closed.wait(0.05)
+        # Still usable while the closer is waiting; no native close/write race.
+        assert store.db.execute('SELECT 1').fetchone()[0] == 1
+    closer.join(2)
+    assert closed.is_set()
