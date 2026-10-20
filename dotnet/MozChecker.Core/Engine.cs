@@ -91,7 +91,11 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                     catch (SourceException ex) { r.Status = "unknown"; r.Errors["availability"] = ex.Message; }
                     Emit(job, r);
                     if (r.Status == "available")
+                    {
+                        r.Stage = "opr_queued";
+                        Emit(job, r);
                         await availability.Writer.WriteAsync(r, t);
+                    }
                     else
                     {
                         r.Stage = "done";
@@ -110,6 +114,11 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                     var batch = new List<Result> { first };
                     while (batch.Count < 100 && availability.Reader.TryRead(out var next))
                         batch.Add(next);
+                    foreach (var r in batch)
+                    {
+                        r.Stage = "opr";
+                        Emit(job, r);
+                    }
                     try
                     {
                         await providers.OprAsync(batch, token);
@@ -119,7 +128,11 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                     {
                         Emit(job, r);
                         if (r.Opr is null || r.Opr >= settings.OprMin)
+                        {
+                            r.Stage = "history_queued";
+                            Emit(job, r);
                             await history.Writer.WriteAsync(r, token);
+                        }
                         else
                         {
                             r.Stage = "done";
@@ -146,6 +159,7 @@ public sealed class Engine(Store store, ApiKeys keys, IProviders providers)
                             r.Errors["history"] = "Sampel tidak lengkap atau tanpa riwayat tidak diizinkan";
                     }
                     catch (SourceException ex) { r.History = "unchecked"; r.Errors["history"] = ex.Message; }
+                    Emit(job, r);
                     if (r.History is "valid" or "no_history" && string.IsNullOrEmpty(r.MozAt))
                     {
                         r.Stage = "moz_queued";

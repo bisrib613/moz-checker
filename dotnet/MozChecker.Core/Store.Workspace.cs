@@ -23,7 +23,7 @@ public sealed partial class Store
         ["registered"] = "json_extract(D,'$.status')='registered'",
         ["passed"] = "json_extract(D,'$.status')='available' AND json_extract(D,'$.history') IN ('valid','no_history')",
         ["pending"] = "json_extract(D,'$.stage')<>'done'",
-        ["active"] = "json_extract(D,'$.stage') NOT IN ('queued','moz_queued','done')",
+        ["active"] = "json_extract(D,'$.stage') IN ('availability','opr','history','moz')",
         ["other"] = "json_extract(D,'$.status')<>'available' AND (coalesce(json_extract(D,'$.availability_at'),'')<>'' OR json_extract(D,'$.stage')='done')"
     };
     private void InitializeWorkspace()
@@ -58,7 +58,8 @@ public sealed partial class Store
         var source = r.Stage switch
         {
             "availability" => previousStage != "availability" || r.AvailabilityAt.Length == 0 ? "Mulai / ulang RDAP-DNS" : $"RDAP {r.RdapHttp?.ToString() ?? "—"}; DNS {r.Dns}; status {r.Status}",
-            "history" => "Pemeriksaan Wayback dimulai",
+            "history" => previousStage == "history" ? $"Hasil Wayback: {r.History}; sampel {r.Sampled}" : "Pemeriksaan Wayback dimulai",
+            "opr" => $"Hasil OPR: {r.Opr?.ToString() ?? "—"}; waktu sumber {r.OprAt}",
             "moz" => "Moz: kuota lokal dipesan untuk permintaan",
             "moz_queued" => $"Wayback selesai: {r.History}; sampel {r.Sampled}",
             "done" => $"Selesai: {r.Status}; riwayat {r.History}; Moz {r.MozState}",
@@ -168,7 +169,7 @@ public sealed partial class Store
         {
             var stats = filter == new ResultFilter() ? Counts(job) : null;
             var count = stats is null ? Convert.ToInt64(Scalar("SELECT COUNT(*) FROM results r WHERE " + where, args)) : view == 0 ? stats.Available : view == 1 ? stats.Other : stats.Pending;
-            using var cmd = Command("SELECT r.data,r.job,CASE WHEN jobs.state='running' AND json_extract(r.data,'$.stage') NOT IN ('queued','moz_queued') THEN 'Diproses' WHEN jobs.state='paused' THEN 'Dijeda' WHEN json_extract(r.data,'$.stage')='moz_queued' THEN 'Menunggu Moz' ELSE 'Menunggu' END FROM results r JOIN jobs ON jobs.id=r.job WHERE " + where + " ORDER BY " + ViewOrder(sort, descending) + $" LIMIT {Math.Clamp(size, 1, 1000)} OFFSET {Math.Max(0, (long)page * size)}", args);
+            using var cmd = Command("SELECT r.data,r.job,CASE WHEN jobs.state='running' AND json_extract(r.data,'$.stage') IN ('availability','opr','history','moz') THEN 'Diproses' WHEN jobs.state='paused' THEN 'Dijeda' WHEN json_extract(r.data,'$.stage')='moz_queued' THEN 'Menunggu Moz' WHEN json_extract(r.data,'$.stage')='history_queued' THEN 'Menunggu Wayback' WHEN json_extract(r.data,'$.stage')='opr_queued' THEN 'Menunggu OPR' ELSE 'Menunggu' END FROM results r JOIN jobs ON jobs.id=r.job WHERE " + where + " ORDER BY " + ViewOrder(sort, descending) + $" LIMIT {Math.Clamp(size, 1, 1000)} OFFSET {Math.Max(0, (long)page * size)}", args);
             using var reader = cmd.ExecuteReader();
             var rows = new List<Result>();
             while (reader.Read())

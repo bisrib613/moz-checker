@@ -155,12 +155,13 @@ public sealed partial class Store : IDisposable
                 return;
             using var tx = db.BeginTransaction();
             Execute("UPDATE results SET data=$p0 WHERE job=$p1 AND domain=$p2", data, job, result.Domain);
-            if (result.Stage != "queued")
+            if (result.Stage != "queued" && !result.Stage.EndsWith("_queued", StringComparison.Ordinal))
             {
                 using var old = JsonDocument.Parse(previous);
                 var previousStage = old.RootElement.GetProperty("stage").GetString() ?? "";
-                var status = (result.Stage == "availability" && previousStage != "availability") || result.Stage == "history" ? "started" : result.Stage == "moz" ? "reserved" : result.Status;
-                AddEvent(job, result.Domain, result.Stage, status, EventMessage(result, previousStage));
+                var status = (result.Stage == "availability" && previousStage != "availability") || (result.Stage == "history" && previousStage != "history") ? "started" : result.Stage == "moz" ? "reserved" : result.Status;
+                if (result.Stage != "opr" || previousStage == "opr")
+                    AddEvent(job, result.Domain, result.Stage, status, EventMessage(result, previousStage));
             }
             tx.Commit();
         }

@@ -318,6 +318,26 @@ public sealed class CoreTests : IDisposable
         Assert.Empty(fake.MozDomains);
     }
     [Fact]
+    public async Task DomainsWaitingForHistoryDoNotCountAsActiveOrBecomeQueueLogRows()
+    {
+        using var store = Open();
+        var id = store.NewJob(Enumerable.Range(0, 100).Select(i => $"waiting{i}.com"));
+        var fake = new FakeProviders { HoldHistory = true };
+        var engine = new Engine(store, new(), fake);
+        engine.Start();
+        try
+        {
+            await fake.HistoryEntered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            var deadline = DateTime.UtcNow.AddSeconds(20);
+            while (store.Page(id, 2, new(), size: 500).Rows.Count(r => r.Stage == "history_queued") != 99 && DateTime.UtcNow < deadline)
+                await Task.Delay(20);
+            Assert.Equal(99, store.Page(id, 2, new(), size: 500).Rows.Count(r => r.Stage == "history_queued"));
+            Assert.Equal(1, store.Counts(id).Active);
+            Assert.DoesNotContain(store.Events(id, size: 1000).Rows, e => e.Stage.EndsWith("queued"));
+        }
+        finally { engine.Pause(); await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(20)); }
+    }
+    [Fact]
     public async Task OneSessionProcessesPastTheOldThousandDomainBoundary()
     {
         using var store = Open();
