@@ -23,6 +23,13 @@
       "package_sha256": "2ea977e8ec9fac4b8cc5ce5b711364199a987c76686adb984f83af62b77b820a",
       "draft_release_id": 418315409,
       "decision": "User requested removal of the 5 MB import limit. The exact C# preview passed 45 core tests on Windows/Linux and protected WPF smoke; publish only after complete payload verification. Earlier Python investigation remains unresolved."
+    },
+    "v0.4.0": {
+      "build_run_id": "39423924911",
+      "source_commit": "bfce41d35454dd46707667f1c8dfec18c88f4169",
+      "package_sha256": "62037ea11509c6d17f5ee0c37b6298f0de4f9c3dfc8fb4ccb1f79268b50584fa",
+      "draft_release_id": 418389099,
+      "decision": "User requested full-list processing without the 1,000-domain split, plain native UI and distinct persistent event logs. Exact C# preview passed 56 core tests on Windows/Linux and protected native WPF smoke; publish only after uploaded payload verification. Previous Python endpoint investigation remains open."
     }
   }
 }

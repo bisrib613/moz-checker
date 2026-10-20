@@ -1,14 +1,18 @@
 # Moz Checker — C# / WPF for Windows 11
 
-Versi desktop C# (v0.3.2 Preview) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). [Unduh v0.3.2 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.3.2). Publikasi preview ini dibatasi ke paket C# yang telah diverifikasi; investigasi paket Python lama masih terbuka.
+Versi desktop C# (v0.4.0 Preview) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). [Unduh v0.4.0 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.4.0). Publikasi preview ini dibatasi ke paket C# yang telah diverifikasi; investigasi paket Python lama masih terbuka.
 
-**Impor v0.3.2:** CSV/TXT/TSV langsung diparse menjadi domain bersih dengan jumlah valid, duplikat dan tidak valid. Koma, titik koma, tab dan header umum dideteksi otomatis. Daftar lebih dari 1.000 domain tidak ditolak: saat Mulai hunting, otomatis dibagi ke antrean hunting maksimal 1.000 domain per hunting. Batas ukuran file 5 MB sudah dihapus; tidak ada batas ukuran file pengganti di aplikasi.
+**Daftar besar v0.4.0:** satu impor menjadi satu pemeriksaan penuh, tanpa pemecahan per 1.000 domain atau batas file 5 MB. CSV/TXT/TSV langsung diparse dan dideduplikasi. Pratinjau input dan tabel dibagi per 200 baris; seluruh daftar tetap diproses, dicari, dan diekspor.
+
+**Antarmuka:** toolbar dan tabel native Windows, tanpa kartu dashboard. Tab **Available**, **Hasil lainnya**, **Antrean / proses**, dan **Log kejadian** memisahkan hasil, pekerjaan menunggu, serta kejadian aktual. Log tersimpan, bertimestamp, dan terbaru di atas. Pilih **Semua pemeriksaan → Lanjutkan** untuk melanjutkan seluruh sesi lama yang dijeda; hasil lama dipertahankan.
+
+![Desktop WPF v0.4.0](docs/desktop-wpf.png)
 
 Implementasi Python di bawah dipertahankan sebagai referensi versi 0.2.0; perintah Python bukan cara menjalankan desktop WPF baru.
 
 # Expired Domain Checker
 
-> **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Paket lama tetap dalam investigasi; v0.3.2 C# diterbitkan sebagai preview dengan bukti pengujian dan batasannya. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).
+> **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Paket lama tetap dalam investigasi; v0.4.0 C# diterbitkan sebagai preview dengan bukti pengujian dan batasannya. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).
 
 Aplikasi desktop Windows untuk riset expired domain. Data hunting dan cache berada di SQLite lokal; key berada di credential vault sistem. Tidak ada server pusat, pembelian domain otomatis, atau scraping tool SEO.
 
