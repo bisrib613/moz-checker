@@ -1,0 +1,44 @@
+name: Test and Windows desktop build
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: uv sync --frozen --extra dev
+      - run: uv run --frozen --extra dev ruff check src tests
+      - run: uv run --frozen --extra dev pytest -q
+      - run: uv run --frozen --extra dev python -m moz_checker --smoke
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - if: runner.os == 'Windows'
+        name: Test frozen desktop and package portable app
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath "$PWD/dist/MozChecker/MozChecker.exe" -ArgumentList "--smoke" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Frozen desktop smoke failed: $($process.ExitCode)" }
+          Compress-Archive -Path dist/MozChecker -DestinationPath dist/MozChecker-Windows-x64.zip
+          $hash = (Get-FileHash dist/MozChecker-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  MozChecker-Windows-x64.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MozChecker-Windows
+          path: |
+            dist/MozChecker-Windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
