@@ -53,10 +53,21 @@ public partial class MainWindow : Window
         AddShortcut(Key.O, () => ImportClick(this, new()));
         AddShortcut(Key.OemComma, () => SettingsClick(this, new()));
         Closing += OnClosing;
+        SizeChanged += (_, _) => UpdateDensity();
         if (!smoke)
             Loaded += async (_, _) => await RefreshAsync();
         if (!smoke)
             DomainInput.Focus();
+    }
+    private void UpdateDensity()
+    {
+        var compact = ActualHeight < 780;
+        LayoutRoot.Margin = compact ? new Thickness(16, 12, 16, 10) : new Thickness(24, 20, 24, 14);
+        HeaderBar.Margin = new Thickness(0, 0, 0, compact ? 10 : 18);
+        ResumeBanner.Margin = new Thickness(0, 0, 0, compact ? 8 : 14);
+        InputPanel.Margin = new Thickness(0, 0, 0, compact ? 8 : 14);
+        ProgressPanel.Margin = new Thickness(0, 0, 0, compact ? 8 : 16);
+        ResumeHint.Visibility = ResultSummary.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
     }
     private Engine NewEngine(ApiKeys keys) => new(store, keys, new Providers(store, keys, transport));
     private void AddShortcut(Key key, Action action)

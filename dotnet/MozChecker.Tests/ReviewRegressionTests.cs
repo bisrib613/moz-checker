@@ -234,6 +234,41 @@ public sealed class ReviewRegressionTests : IDisposable
         Assert.Equal(16, reopened.GetSettings().AvailabilityWorkers);
     }
     [Fact]
+    public void MalformedCacheDoesNotEraseStoredResearch()
+    {
+        using var store = new Store(Database);
+        var job = store.NewJob(["keep.com"]);
+        using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Database};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "INSERT INTO cache VALUES('iana','bootstrap',$at,'broken json')";
+            command.Parameters.AddWithValue("$at", JsonData.Now());
+            command.ExecuteNonQuery();
+        }
+        Assert.Null(store.CacheGet<JsonNode>("iana", "bootstrap", 86400));
+        Assert.Equal("keep.com", store.Results(job).Single().Domain);
+        Assert.Equal(1, store.Counts(job).Total);
+    }
+    [Fact]
+    public async Task UnexpectedWorkerFailureIsPersistedWithoutThirdPartyExceptionText()
+    {
+        using (var store = new Store(Database))
+        {
+            var job = store.NewJob(["failure.com"]);
+            var engine = new Engine(store, new(), new TrackingProviders { ThrowOpr = true });
+            engine.Start(job);
+            await engine.Completion!.WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.Equal("paused", store.Jobs().Single().State);
+            Assert.Contains("InvalidOperationException", engine.Failure);
+            Assert.DoesNotContain("secret", engine.Failure);
+        }
+        using var reopened = new Store(Database);
+        var failure = reopened.Events(null).Rows.Single(e => e.Stage == "worker");
+        Assert.Contains("InvalidOperationException", failure.Message);
+        Assert.DoesNotContain("secret", failure.Message);
+    }
+    [Fact]
     public void FailedExportPreservesExistingFileAndCleansTemporaryOutput()
     {
         Directory.CreateDirectory(directory);
@@ -260,6 +295,7 @@ public sealed class ReviewRegressionTests : IDisposable
         public ConcurrentQueue<string> History { get; } = new();
         public ConcurrentQueue<string> Moz { get; } = new();
         public bool BlockAvailability { get; init; }
+        public bool ThrowOpr { get; init; }
         public int WorkerTarget { get; init; }
         private int peak;
         public int Peak => Volatile.Read(ref peak);
@@ -284,6 +320,7 @@ public sealed class ReviewRegressionTests : IDisposable
         }
         public Task OprAsync(IReadOnlyList<Result> rows, CancellationToken ct)
         {
+            if (ThrowOpr) throw new InvalidOperationException("third-party secret must not appear in logs");
             foreach (var r in rows) { Opr.Enqueue(r.Domain); r.Opr = 5; r.OprAt = JsonData.Now(); r.Errors.Remove("opr"); }
             return Task.CompletedTask;
         }
