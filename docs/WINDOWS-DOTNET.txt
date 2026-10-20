@@ -1,0 +1,25 @@
+Moz Checker 0.3.0 - Windows 11 x64 / C# + WPF
+
+Requires Microsoft .NET 10 Desktop Runtime x64:
+https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+Choose .NET Desktop Runtime, Windows x64. ASP.NET runtime alone is insufficient.
+Python is not required. Extract the WHOLE folder before launching MozChecker.exe.
+This is a framework-dependent build; it does not contain the .NET runtime.
+
+Security review remains unresolved for the prior Python release. A .NET migration
+or a scan without detections does not prove the cause or establish a false positive.
+Public release remains on hold. Never disable antivirus or restore a quarantined
+file to make this app run. See docs/SECURITY-INVESTIGATION.md in the repository.
+
+Data: %LOCALAPPDATA%\MozChecker\checker.sqlite3
+The first .NET opening of an existing database creates checker.sqlite3.before-dotnet.bak
+using SQLite backup, including committed WAL data. Keep it for rollback.
+Close the older Python application before using this version. Interrupted jobs are
+paused until you choose Lanjutkan. Existing quota and metrics are retained.
+Existing Windows Credential Manager keys are read without plaintext migration.
+
+Only available domains appear in results and CSV. Registered, redemption,
+pending_delete, unknown, and queued outcomes are in Log pemeriksaan.
+Available means an authoritative RDAP protocol 404 plus DNS NXDOMAIN. It is a
+candidate, not a registration guarantee. Confirm again at a registrar before buying.
+Moz uses legacy Links API v2 access ID + secret; v3 tokens are unsupported.

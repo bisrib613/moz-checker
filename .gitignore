@@ -9,3 +9,5 @@ dist/
 *.spec
 *.sqlite*
 .env
+**/bin/
+**/obj/

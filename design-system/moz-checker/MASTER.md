@@ -41,3 +41,7 @@ The refined `analytics dashboard productivity` design-system query returned the 
 - Visible field labels, accessible names for controls and contextual stat cards, full native keyboard interaction, text descriptions of all states.
 - Contrast measured for primary, muted, accent, error, and blue text against the relevant dark surfaces; target ≥4.5:1 for text. No claim of formal screen-reader certification or manual high-DPI Windows validation.
 - Preview images with populated rows must be labeled simulated and use a temporary database. Never seed sample domains/metrics into the user's application data.
+
+## WPF migration (0.3.0)
+
+Visual direction and information hierarchy above carry over to native WPF. `dotnet/MozChecker.Desktop/App.xaml` defines semantic brushes and control states. The verified UI/UX Pro Max WPF search recommends native keyboard navigation and proportional Grid layout; the implementation uses both, with virtualized DataGrid rows/columns. Labels and automation names accompany fields. Native combo boxes retain platform popup semantics. The minimum desktop size remains 1040×700; sidebar and dialogs scroll. Mobile safe-area/phone checks are outside this Windows desktop scope. No decorative motion is introduced. Native Windows render and smoke checks are recorded in CI, with screen-reader and high-DPI validation still manual.

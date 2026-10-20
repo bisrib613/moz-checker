@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier><AssemblyName>MozChecker</AssemblyName><Version>0.3.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>false</PublishSingleFile><PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../MozChecker.Core/MozChecker.Core.csproj" /></ItemGroup>
+</Project>

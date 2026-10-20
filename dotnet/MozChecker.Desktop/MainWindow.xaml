@@ -1,0 +1,51 @@
+<Window x:Class="MozChecker.Desktop.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Moz Checker · Domain Research" Width="1440" Height="900" MinWidth="1040" MinHeight="700" WindowStartupLocation="CenterScreen">
+ <Grid Margin="24">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <DockPanel Margin="0,0,0,24"><StackPanel DockPanel.Dock="Left"><TextBlock Text="moz / checker" FontSize="23" FontWeight="Bold"/><TextBlock Text="DOMAIN RESEARCH WORKSPACE" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,4,0,0"/></StackPanel><Button Content="Pengaturan API &amp; aturan" Click="SettingsClick" HorizontalAlignment="Right" ToolTip="Pengaturan (Ctrl+,)"/></DockPanel>
+  <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12" Padding="20">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+     <StackPanel>
+      <TextBlock Text="Mulai hunting" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="Dari daftar domain ke shortlist." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,16"/>
+      <Label Content="Daftar domain" Target="{Binding ElementName=DomainInput}"/>
+      <TextBox x:Name="DomainInput" AcceptsReturn="True" Height="190" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" FontFamily="Consolas" AutomationProperties.Name="Daftar domain, satu per baris" ToolTip="Maksimal 1.000 domain; URL dan IDN dinormalisasi"/>
+      <Button Content="Impor CSV / TXT" Click="ImportClick" Margin="0,12,0,0" ToolTip="Impor (Ctrl+O)"/>
+      <TextBlock x:Name="InputFeedback" Text="Maksimal 1.000 domain per hunting." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,10"/>
+      <Expander Header="Generate dari kata kunci" Foreground="{StaticResource TextBrush}" Margin="0,0,0,12"><StackPanel Margin="0,8,0,0"><Label Content="Kata kunci" Target="{Binding ElementName=Keywords}"/><TextBox x:Name="Keywords" ToolTip="Contoh: kebun, kopi"/><Label Content="TLD" Target="{Binding ElementName=Tlds}"/><TextBox x:Name="Tlds" Text="com, net, org"/><Button Content="Generate daftar" Click="GenerateClick" Margin="0,10,0,0"/></StackPanel></Expander>
+      <Button x:Name="StartButton" Content="Mulai hunting" Style="{StaticResource PrimaryButton}" Click="StartClick" ToolTip="Mulai / antrekan (Ctrl+Enter)"/>
+      <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,24,0,0" Padding="0,18,0,0"><StackPanel><TextBlock Text="ANGGARAN MOZ LOKAL" Foreground="{StaticResource MutedBrush}" FontSize="11"/><TextBlock x:Name="QuotaText" FontSize="16" Margin="0,8,0,0" TextWrapping="Wrap"/><TextBlock Text="Penghitung lokal, bukan saldo dari Moz. Kunci tersimpan di Credential Manager." Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Border>
+     </StackPanel>
+    </ScrollViewer>
+   </Border>
+   <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,16"><StackPanel><TextBlock Text="Temukan peluang berikutnya." FontSize="25" FontWeight="SemiBold"/><TextBlock Text="Hanya domain available yang masuk daftar hasil." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/></StackPanel><Button x:Name="ExportButton" Content="Ekspor CSV" Click="ExportClick" HorizontalAlignment="Right" VerticalAlignment="Top" IsEnabled="False"/></DockPanel>
+    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,20">
+     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" Margin="0,0,8,0"><StackPanel><TextBlock Text="Available" Foreground="{StaticResource MutedBrush}"/><TextBlock x:Name="AvailableStat" Text="0" FontSize="28" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold"/></StackPanel></Border>
+     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" Margin="0,0,8,0"><StackPanel><TextBlock Text="Diperiksa" Foreground="{StaticResource MutedBrush}"/><TextBlock x:Name="CheckedStat" Text="0" FontSize="28" FontWeight="SemiBold"/></StackPanel></Border>
+     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16" Margin="0,0,8,0"><StackPanel><TextBlock Text="Riwayat lolos" Foreground="{StaticResource MutedBrush}"/><TextBlock x:Name="HistoryStat" Text="0" FontSize="28" FontWeight="SemiBold"/></StackPanel></Border>
+     <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16"><StackPanel><TextBlock Text="Registered" Foreground="{StaticResource MutedBrush}"/><TextBlock x:Name="RegisteredStat" Text="0" FontSize="28" FontWeight="SemiBold"/></StackPanel></Border>
+    </UniformGrid>
+    <Grid Grid.Row="2" Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ComboBox x:Name="Jobs" MinHeight="40" SelectionChanged="JobsChanged" AutomationProperties.Name="Pilih hunting"/><Button Grid.Column="1" x:Name="PauseButton" Content="Jeda" Click="PauseClick" Margin="8,0,0,0"/><Button Grid.Column="2" x:Name="ResumeButton" Content="Lanjutkan" Click="ResumeClick" Margin="8,0,0,0"/><Button Grid.Column="3" x:Name="RetryButton" Content="Ulang sumber gagal" Click="RetryClick" Margin="8,0,0,0"/></Grid>
+    <StackPanel Grid.Row="3" Margin="0,0,0,12"><ProgressBar x:Name="Progress" Height="5" Foreground="{StaticResource AccentBrush}" Background="{StaticResource SurfaceBrush}"/><TextBlock x:Name="ProgressText" Text="Workspace siap. Masukkan daftar domain untuk mulai." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel>
+    <TabControl Grid.Row="4" x:Name="ResultTabs" SelectionChanged="TabChanged">
+     <TabItem Header="Daftar available"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid Margin="0,12,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Search" AutomationProperties.Name="Cari domain available" ToolTip="Cari domain (Ctrl+F)" TextChanged="SearchChanged"/><Button Grid.Column="1" x:Name="FilterButton" Content="Filter" Click="FilterClick" Margin="8,0,0,0"/><Button Grid.Column="2" Content="Reset" Click="ResetClick" Margin="8,0,0,0"/></Grid>
+      <Grid Grid.Row="1"><DataGrid x:Name="ResultsGrid" MouseDoubleClick="EvidenceClick" PreviewKeyDown="GridKeyDown" AutomationProperties.Name="Hasil domain available"><DataGrid.Columns>
+       <DataGridTextColumn Header="Domain" Binding="{Binding Domain}" Width="180"/>
+       <DataGridTextColumn Header="OPR" Binding="{Binding Opr, StringFormat=F2, TargetNullValue=—}" Width="70"/>
+       <DataGridTextColumn Header="Moz DA" Binding="{Binding Da, StringFormat=F0, TargetNullValue=—}" Width="80"/>
+       <DataGridTextColumn Header="Moz PA" Binding="{Binding Pa, StringFormat=F0, TargetNullValue=—}" Width="80"/>
+       <DataGridTextColumn Header="Spam" Binding="{Binding Spam, StringFormat=F0, TargetNullValue=—}" Width="70"/>
+       <DataGridTextColumn Header="Riwayat" Binding="{Binding History}" Width="100"/>
+       <DataGridTextColumn Header="Snapshot" Binding="{Binding Snapshots, TargetNullValue=—}" Width="85"/>
+       <DataGridTextColumn Header="Kesiapan" Binding="{Binding Readiness}" Width="200"/>
+      </DataGrid.Columns></DataGrid><Border x:Name="EmptyState" Background="{StaticResource InputBrush}" IsHitTestVisible="False"><StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"><TextBlock x:Name="EmptyTitle" Text="Shortlist masih kosong" FontSize="21" HorizontalAlignment="Center"/><TextBlock x:Name="EmptyDescription" Text="Mulai hunting untuk menemukan domain available." TextAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0"/></StackPanel></Border></Grid>
+      <Button Grid.Row="2" x:Name="EvidenceButton" Content="Lihat bukti domain terpilih" Click="EvidenceClick" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+     </Grid></TabItem>
+     <TabItem Header="Log pemeriksaan"><TextBox x:Name="Log" FontFamily="Consolas" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,12,0,0" AutomationProperties.Name="Log semua hasil pemeriksaan"/></TabItem>
+    </TabControl>
+   </Grid>
+  </Grid>
+  <TextBlock Grid.Row="2" Text="Ketersediaan dapat berubah. Periksa lagi di registrar sebelum membeli. Riwayat dinilai dari sampel; bukan jaminan bersih." Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,16,0,0" TextWrapping="Wrap"/>
+ </Grid>
+</Window>

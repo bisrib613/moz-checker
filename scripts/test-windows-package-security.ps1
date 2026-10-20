@@ -65,7 +65,7 @@ try {
     New-NetFirewallRule -DisplayName $ruleName -Direction Outbound -Program $exe -Action Block | Out-Null
     $info = [System.Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $exe
-    $info.Arguments = '--smoke'
+    $info.Arguments = '--smoke --screenshot "' + (Join-Path $ReportDirectory 'desktop.png') + '"'
     $info.WorkingDirectory = $data
     $info.UseShellExecute = $false
     $info.Environment.Clear()
@@ -74,7 +74,7 @@ try {
     foreach ($name in @('TEMP', 'TMP', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA')) { $info.Environment[$name] = $data }
     $info.Environment['QT_QPA_PLATFORM'] = 'windows'
     $info.Environment['MOZ_CHECKER_DATA_DIR'] = $data
-    $report.testScope = 'Native Windows Qt --smoke startup; empty profile, no API keys, clean child environment, outbound network blocked. This is not an audit of every feature.'
+    $report.testScope = 'Native Windows desktop --smoke startup; empty profile, no API keys, clean child environment, outbound network blocked. This is not an audit of every feature.'
     $process = [System.Diagnostics.Process]::Start($info)
     $report.appExecuted = $true
     if (-not $process.WaitForExit(60000)) { throw 'Startup smoke test timed out' }

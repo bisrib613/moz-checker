@@ -1,3 +1,9 @@
+# Moz Checker — C# / WPF for Windows 11
+
+Versi desktop berikutnya (0.3.0 development) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). Rilis publik tetap ditahan selama investigasi Defender belum selesai.
+
+Implementasi Python di bawah dipertahankan sebagai referensi versi 0.2.0; perintah Python bukan cara menjalankan desktop WPF baru.
+
 # Expired Domain Checker
 
 > **Status keamanan Windows:** Ada laporan Defender mengarantina `MozChecker.exe` sebagai `Behavior:Win32/DefenseEvasion.A!ml` (Severe). Penyebab belum dipastikan. Jangan menjalankan atau memulihkan file yang dikarantina dan jangan menonaktifkan antivirus. Publikasi rilis baru ditahan. Lihat [investigasi](docs/SECURITY-INVESTIGATION.md).

@@ -1,7 +1,5 @@
-$ErrorActionPreference = "Stop"
-Set-Location (Join-Path $PSScriptRoot "..")
-uv sync --frozen --extra dev
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-uv run --frozen --extra dev python -m PyInstaller --noconfirm --clean --windowed --onedir --name MozChecker --paths src --hidden-import keyring.backends.Windows --collect-data tldextract scripts/desktop_entry.py
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Write-Host "Portable app: dist/MozChecker/MozChecker.exe. Keep the whole MozChecker folder."
+$ErrorActionPreference = 'Stop'
+# Framework-dependent, ordinary WPF files. No Python, packer, single-file extraction, or trimming.
+dotnet publish dotnet/MozChecker.Desktop --configuration Release --self-contained false --no-restore -o dist/MozChecker
+if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed' }
+Copy-Item docs/WINDOWS-DOTNET.txt dist/MozChecker/README.txt

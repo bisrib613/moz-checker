@@ -1,0 +1,7 @@
+Public Suffix List (ICANN section), https://publicsuffix.org/list/
+Copyright and license: Mozilla Public License 2.0, https://mozilla.org/MPL/2.0/
+The embedded public_suffix_list.dat preserves the source header and ICANN rules
+from tldextract's .tld_set_snapshot already locked by this repository's uv.lock.
+Private-domain rules are omitted to match the previous app's registry-level validation.
+No network refresh occurs during normalization. Update this resource deliberately
+when updating the application's PSL snapshot.

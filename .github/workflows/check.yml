@@ -9,24 +9,21 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
-      QT_QPA_PLATFORM: offscreen
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-dotnet@v4
         with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@v6
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
-      - run: uv sync --frozen --extra dev
-      - run: uv run --frozen --extra dev ruff check src tests
-      - run: uv run --frozen --extra dev pytest -q
-      - run: uv run --frozen --extra dev python -m moz_checker --smoke
+          dotnet-version: '10.0.x'
+      - run: dotnet restore dotnet/MozChecker.Tests --locked-mode
+      - run: dotnet test dotnet/MozChecker.Tests --no-restore --configuration Release --logger "trx;LogFileName=core.trx"
+      - if: runner.os == 'Windows'
+        run: dotnet restore dotnet/MozChecker.Desktop --locked-mode
       - if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/build-windows.ps1
       - if: runner.os == 'Windows'
-        name: Test frozen desktop and package portable app
+        name: Defender validation and native WPF smoke before packaging
         shell: pwsh
         run: |
           ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/dist/MozChecker" -ReportDirectory "$PWD/security-validation" -RemoveRunnerExclusions
@@ -34,6 +31,7 @@ jobs:
           Compress-Archive -Path dist/MozChecker -DestinationPath dist/MozChecker-Windows-x64.zip
           $hash = (Get-FileHash dist/MozChecker-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  MozChecker-Windows-x64.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Get-Item dist/MozChecker-Windows-x64.zip | Select-Object Name, Length
       - if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
@@ -48,4 +46,10 @@ jobs:
         with:
           name: Windows-security-validation
           path: security-validation/
+          if-no-files-found: warn
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Core-test-results-${{ runner.os }}
+          path: dotnet/MozChecker.Tests/TestResults/*.trx
           if-no-files-found: warn

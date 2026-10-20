@@ -5,11 +5,11 @@ on:
       version:
         description: 'Release tag matching the tested application version'
         required: true
-        default: 'v0.1.0'
+        default: 'v0.3.0'
       build_run_id:
         description: 'Successful Test and Windows desktop build run from a main push'
         required: true
-        default: '39381241322'
+        default: ''
 permissions:
   contents: read
 jobs:
