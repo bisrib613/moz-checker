@@ -1,0 +1,32 @@
+name: Publish verified Windows release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag matching the tested application version'
+        required: true
+        default: 'v0.1.0'
+      build_run_id:
+        description: 'Successful Test and Windows desktop build run from a main push'
+        required: true
+        default: '39381241322'
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify tested artifact and publish preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.version }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: python scripts/publish-release.py

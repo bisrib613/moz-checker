@@ -66,3 +66,7 @@ Tes memakai respons terkontrol: aturan bukti ganda, batching/cache, sampling, ke
 Struktur: `models.py` normalisasi/hasil; `providers.py` jaringan/rate limiting; `engine.py` antrean/pipeline; `store.py` SQLite/cache/kuota/CSV; `secrets.py` credential vault; `ui.py` desktop.
 
 F8 filter dasar sudah tersedia. Watchlist/notifikasi harian (F10), heuristik lonjakan spam (F11), installer/update otomatis, dukungan Moz v3, dan WHOIS fallback belum diimplementasikan. Windows portable build dan pengujian akun API nyata tetap merupakan pemeriksaan rilis yang wajib.
+
+## Publikasi GitHub Release
+
+Setelah workflow **Test and Windows desktop build** untuk push ke `main` sukses, jalankan **Publish verified Windows release** dari tab Actions. Isi tag versi yang sesuai `pyproject.toml` dan ID build yang sukses. Catatan rilis harus tersedia di `docs/releases/<tag>.md`. Publisher mengambil artefak dari run tersebut, memeriksa asal workflow/commit, versi, checksum, ZIP dan PE x64, lalu membuat pre-release dengan paket portable serta `SHA256SUMS.txt`. Token bawaan GitHub Actions digunakan; tidak perlu menaruh personal access token di source atau settings aplikasi. Release yang sudah ada tidak ditimpa.
