@@ -1,0 +1,186 @@
+{
+  "build_run": "https://github.com/bisrib613/moz-checker/actions/runs/39413799087",
+  "source_commit": "7e4be0def7dc67856196a32a8f1419e38b313085",
+  "package_sha256": "2ea977e8ec9fac4b8cc5ce5b711364199a987c76686adb984f83af62b77b820a",
+  "package_bytes": 1612341,
+  "core_tests": {
+    "windows": 45,
+    "linux": 45
+  },
+  "limitation": "Limited runner testing; previous Python endpoint investigation remains unresolved",
+  "defender_report": {
+    "status": "protected_startup_completed_no_detections",
+    "appExecuted": true,
+    "startedAtUtc": "2026-10-20T11:18:55.2277343Z",
+    "payloadFiles": [
+      {
+        "path": "DnsClient.dll",
+        "sha256": "fcf2d07f01bb34f6e8ea61da6d281d1979b5d3c1485bcc5b2b350ec8c59cc2f0",
+        "bytes": 157184
+      },
+      {
+        "path": "e_sqlite3.dll",
+        "sha256": "b7385d722c83fb52142a00477a726723745916d22a555711ee89834c1111fb2e",
+        "bytes": 1978880
+      },
+      {
+        "path": "HtmlAgilityPack.dll",
+        "sha256": "0192aac36f5ee31e09946ec98fdc63a371743b685d25094050217a3b38754c2b",
+        "bytes": 170496
+      },
+      {
+        "path": "licenses\\DnsClient-LICENSE.txt",
+        "sha256": "e03ba41d7fab20700769fe4118bab50d800cb74f990353a05d2f5fff1c228363",
+        "bytes": 11558
+      },
+      {
+        "path": "licenses\\HtmlAgilityPack-LICENSE.txt",
+        "sha256": "a072e0090690ac786e72240b211b360125aff54b4181acc7c8083e899556835e",
+        "bytes": 1063
+      },
+      {
+        "path": "licenses\\Microsoft-LICENSE.txt",
+        "sha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab",
+        "bytes": 1137
+      },
+      {
+        "path": "licenses\\NOTICE.txt",
+        "sha256": "54fa728da1d549cea6d24605e4a60aba78f8512f14c006011ba404b664be37c3",
+        "bytes": 1320
+      },
+      {
+        "path": "licenses\\PublicSuffixList-MPL-2.0.txt",
+        "sha256": "9221c2f936159b8446d329249fb4c0f25be510f447383a0f13336ac7985668a3",
+        "bytes": 17099
+      },
+      {
+        "path": "licenses\\SQLitePCLRaw-LICENSE.txt",
+        "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+        "bytes": 11560
+      },
+      {
+        "path": "Microsoft.Data.Sqlite.dll",
+        "sha256": "9f1fe804321767b6cc8db751ecedd56ab308e5f15492a7f40d7093bb61ab7638",
+        "bytes": 177464
+      },
+      {
+        "path": "MozChecker.Core.dll",
+        "sha256": "42dedaf5215751001af9b1a888dd1967d35f4f4c833ac635db7428811b42955d",
+        "bytes": 306688
+      },
+      {
+        "path": "MozChecker.Core.pdb",
+        "sha256": "f464b8cac6bc446f8dcf4731697d332fb62ef45a5910a11e8ce9f077d1944a10",
+        "bytes": 32044
+      },
+      {
+        "path": "MozChecker.deps.json",
+        "sha256": "c7d0ee4cd8249388274952de97e344a1ea15e6778980c0ca40524cc8762d17bb",
+        "bytes": 5850
+      },
+      {
+        "path": "MozChecker.dll",
+        "sha256": "b44ddad2e10bd1a082cbf5db41767d220ab9a847f9bcde21f603fd9ff34a9996",
+        "bytes": 69120
+      },
+      {
+        "path": "MozChecker.exe",
+        "sha256": "1ade559a69e5d9ed83ecbd657ee09370e17dca7f021bfa3ae5acf09442cd6507",
+        "bytes": 162816
+      },
+      {
+        "path": "MozChecker.pdb",
+        "sha256": "b78fb3491679c9ca1a44b7b7fa7b459ca1dfdb4d3a6192e8a46c903b3b039aea",
+        "bytes": 30340
+      },
+      {
+        "path": "MozChecker.runtimeconfig.json",
+        "sha256": "96bc2946dff8790400d652ec7f8de7bb043e954980d59470c112788b68a1fbd3",
+        "bytes": 519
+      },
+      {
+        "path": "README.txt",
+        "sha256": "9ec7affb68410e85cce745fecbfd43530026d1713604733d33b3a2c1e98fd37e",
+        "bytes": 1953
+      },
+      {
+        "path": "SQLitePCLRaw.batteries_v2.dll",
+        "sha256": "bc69777001eb4db81c580f62835396f67e74aaa381eef446193a904499d5310b",
+        "bytes": 5120
+      },
+      {
+        "path": "SQLitePCLRaw.core.dll",
+        "sha256": "50c999a1ab2afeacc93bce5ac2948d3bb630d99d23efc3cfcbd8bc11d3426eb7",
+        "bytes": 51200
+      },
+      {
+        "path": "SQLitePCLRaw.provider.e_sqlite3.dll",
+        "sha256": "369ea2a63067ca06328774191e0e6dc604aec8621d09b7f7c283fbbcaf533265",
+        "bytes": 36864
+      }
+    ],
+    "exeSha256": "1ade559a69e5d9ed83ecbd657ee09370e17dca7f021bfa3ae5acf09442cd6507",
+    "authenticode": "NotSigned",
+    "defender": {
+      "AMServiceEnabled": true,
+      "AntivirusEnabled": true,
+      "RealTimeProtectionEnabled": true,
+      "BehaviorMonitorEnabled": true,
+      "AMEngineVersion": "1.1.26090.9",
+      "AntivirusSignatureVersion": "1.461.115.0",
+      "AntivirusSignatureLastUpdated": "2026-10-20T02:23:23+00:00"
+    },
+    "preferences": {
+      "DisableRealtimeMonitoring": false,
+      "DisableBehaviorMonitoring": false,
+      "MAPSReporting": 0,
+      "SubmitSamplesConsent": 2
+    },
+    "applicableExclusions": {
+      "extensions": [],
+      "processes": [],
+      "paths": [
+        "C:\\"
+      ]
+    },
+    "exclusionsRemovedOnDisposableRunner": true,
+    "scanExitCode": 0,
+    "firewallProfiles": [
+      {
+        "Name": "Domain",
+        "Enabled": 1
+      },
+      {
+        "Name": "Private",
+        "Enabled": 1
+      },
+      {
+        "Name": "Public",
+        "Enabled": 1
+      }
+    ],
+    "testScope": "Native Windows desktop --smoke startup; empty profile, no API keys, clean child environment, outbound network blocked. This is not an audit of every feature.",
+    "appExitCode": 0,
+    "detections": [],
+    "finalDefender": {
+      "RealTimeProtectionEnabled": true,
+      "BehaviorMonitorEnabled": true
+    },
+    "limitation": "One runner, engine/signature and startup path. Does not invalidate a different endpoint detection or establish a false positive."
+  },
+  "wpf_smoke": {
+    "ui": "WPF",
+    "checks": [
+      "IDN/PSL",
+      "eight columns",
+      "available-only results",
+      "registered log",
+      "search",
+      "reset",
+      "CSV button states",
+      "immediate CSV parsing",
+      "large-list import preview"
+    ],
+    "status": "passed"
+  }
+}
