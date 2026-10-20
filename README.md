@@ -21,6 +21,14 @@ Build portable (harus dijalankan di Windows):
 
 Distribusikan seluruh folder `dist/MozChecker`, bukan hanya `.exe`. Workflow GitHub Actions menjalankan pengujian Linux/Windows dan menghasilkan artefak Windows ketika workflow dijalankan. Build belum ditandatangani. Workflow menguji Windows dan executable secara otomatis; pengujian manual pada desktop Windows serta akun API nyata tetap diperlukan sebelum penggunaan produksi.
 
+## Antarmuka v0.2.0
+
+Workspace baru memakai sidebar input, kartu ringkasan terpisah, pencarian shortlist, filter dialog, dan bukti domain yang dibuka saat diperlukan (klik dua kali baris atau tombol Bukti pemeriksaan). Pengaturan API dan aturan hunting berada di dua tab. Shortcut: Ctrl+Enter mulai/antrekan, Ctrl+O impor, Ctrl+F cari, Ctrl+koma pengaturan. Ekspor hanya aktif pada tab hasil dengan baris yang terlihat. Data lokal versi sebelumnya tetap kompatibel.
+
+![Workspace](docs/desktop.png)
+
+Lihat [design system desktop](design-system/moz-checker/MASTER.md) untuk prinsip layout dan aksesibilitas.
+
 ## Alur penggunaan
 
 1. Tempel domain/URL, impor CSV/TXT UTF-8, atau buat kombinasi kata kunci + TLD. Maksimal 1.000 domain unik; URL, `www`, huruf besar, dan IDN dinormalisasi. CSV dengan header `domain` dapat diimpor ulang. Public Suffix List bawaan menolak subdomain (selain awalan www yang dihapus) dan public suffix seperti co.id; keduanya bukan domain yang bisa didaftarkan. TLD belum dikenali PSL dianggap unknown sampai dependency diperbarui.

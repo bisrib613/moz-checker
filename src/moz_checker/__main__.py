@@ -15,10 +15,10 @@ def main():
         from .store import Store
         from .models import normalize
         assert normalize("https://www.bücher.de/path") == "xn--bcher-kva.de"
-        from .ui import Window, STYLE
+        from .ui import Window
+        from .presentation import apply_theme
         app = QApplication([])
-        app.setStyle('Fusion')
-        app.setStyleSheet(STYLE)
+        apply_theme(app)
         with tempfile.TemporaryDirectory() as directory:
             window = Window(Store(Path(directory) / 'smoke.sqlite3'))
             window.show()

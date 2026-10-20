@@ -5,7 +5,7 @@ Dibangun dari PRD pengguna pada 20 Oktober 2026. Platform cloud: Python 3.12, Li
 ## Terverifikasi
 
 - Instalasi dependency menggunakan `uv sync --frozen --extra dev` dan `uv.lock`.
-- 53 tes otomatis offline: normalisasi/IDN/Public Suffix List (tidak menyatakan subdomain available), impor/limit 1.000 domain, bukti RDAP+DNS, batching/cache OPR, sampling/temuan arsip, error/retry, kuota lintas koneksi database, pause/resume, pipeline 1.000 domain simulasi, CSV, filter, dan dialog pengaturan.
+- 57 tes otomatis offline: normalisasi/IDN/Public Suffix List (tidak menyatakan subdomain available), impor/limit 1.000 domain, bukti RDAP+DNS, batching/cache OPR, sampling/temuan arsip, error/retry, kuota lintas koneksi database, pause/resume, pipeline 1.000 domain simulasi, CSV, filter, dan dialog pengaturan.
 - Ruff, startup/render Qt offscreen, inisialisasi SQLite, dan shutdown.
 - Build sdist/wheel dan executable Linux dengan PyInstaller; executable Linux lolos `--smoke`. Ini tidak membuktikan executable Windows.
 - Bootstrap IANA berhasil diambil lewat HTTPX dengan `Accept-Encoding: identity`. Respons terkompresi proxy sempat gagal decoding; permintaan tanpa kompresi mengatasinya tanpa melemahkan TLS verification.
@@ -30,3 +30,7 @@ Draft menyimpan install_script, start_skill, dan host HTTPS: data.iana.org, web.
 Pengguna meninjau dan menyimpan pengaturan environment, lalu Publish untuk snapshot reusable. Penyimpanan draft tidak membuktikan publikasi atau pemulihan pada task baru. Publikasi source dan aset release dilakukan terpisah melalui GitHub; penyimpanan draft environment tidak mem-publish kode.
 
 API key aplikasi diisi melalui dialog Windows, bukan secret cloud atau .env. Publikasi snapshot environment bukan publikasi aplikasi Windows.
+
+## Redesign v0.2.0
+
+Sidebar input, stat cards, pencarian, filter dialog, bukti on-demand dan pengaturan dua tab diuji offline. UI tetap hanya menampilkan available di hasil; status lain ada di log. Screenshot diperiksa pada 1440×900 dan 1040×700 (termasuk empty, hasil simulasi berlabel, dan pengaturan). Pengujian manual high-DPI Windows dan akun API nyata belum dilakukan.
