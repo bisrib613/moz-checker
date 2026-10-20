@@ -36,8 +36,10 @@ Riwayat hasil dan kuota dipertahankan. Event sebelum versi yang menyediakan log 
 
 ## Batas verifikasi
 
-- Tes lokal: 92 tes core, 9 tes tools publisher, 57 tes sumber Python referensi; cross-build WPF tanpa warning/error. Hasil final native Windows dan hash paket dicatat pada bukti rilis.
+- Tes lokal: 92 tes core, 9 tes tools publisher, 57 tes sumber Python referensi; cross-build WPF tanpa warning/error. Native Windows juga lulus 92 tes dan smoke resume. Hash paket dicatat pada bukti rilis.
 - Tes 510.288 domain memverifikasi impor/penyimpanan/query/progres, bukan 510.288 permintaan ke provider nyata. Pipeline mock melewati 1.000 domain; batas rate provider tetap berlaku.
 - OPR/Moz berbayar dengan akun nyata tidak dipanggil dalam review ini. Integrasi Moz tetap Links API v2, bukan token v3; WHOIS belum tersedia. Gangguan jaringan dan TLD tanpa rute resmi tetap unknown.
+- Pemeriksaan dependensi NuGet mencakup paket transitif; sumber advisori saat review tidak melaporkan paket rentan. Ini bukan audit seluruh source dependency.
+- Screenshot native reguler aktual 1044×788 (permintaan 1440×900 dibatasi desktop runner), serta kompak 1040×700.
 - High-DPI, pembaca layar dan perangkat Windows pengguna belum disertifikasi. Screenshot runner menggunakan data sintetis.
 - Python 0.2.0 tetap referensi lama, tidak dikemas dalam EXE baru. Tes sumber lama yang lulus tidak menyelesaikan investigasi karantina binary lamanya. Keterbatasan investigasi dicatat di SECURITY-INVESTIGATION.md.

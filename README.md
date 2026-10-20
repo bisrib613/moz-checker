@@ -1,8 +1,12 @@
 # Moz Checker — C# / WPF for Windows 11
 
-Versi desktop C# (v0.4.1 Preview) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). [Unduh v0.4.1 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.4.1). Publikasi preview ini dibatasi ke paket C# yang telah diverifikasi; investigasi paket Python lama masih terbuka.
+Versi desktop C# (v0.5.0 Preview) menggunakan **C# + .NET 10 WPF**, tanpa Python di paket Windows. Paket kecil membutuhkan **.NET 10 Desktop Runtime x64** yang dipasang terpisah. Lihat [migrasi dan cara build](docs/DOTNET-MIGRATION.md). [Unduh v0.5.0 Preview](https://github.com/bisrib613/moz-checker/releases/tag/v0.5.0). Publikasi preview ini dibatasi ke paket C# yang telah diverifikasi; investigasi paket Python lama masih terbuka.
 
-**RDAP v0.4.1:** rute TLD yang hilang dari cache memicu pembaruan daftar resmi IANA sebelum dinyatakan tidak tersedia. Termasuk `.fr`; setelah upgrade, pilih **Ulang sumber gagal** untuk mencoba kembali. Kegagalan memperbarui daftar dibedakan dari TLD tanpa rute dan tetap berstatus unknown.
+**Workspace v0.5.0:** saat data lama tersedia, banner **Lanjutkan pemeriksaan** menampilkan jumlah domain tersisa dan input baru tertutup. Pilih **Semua pemeriksaan** untuk antrean lama; tidak perlu impor ulang. Resume mengikuti checkpoint, retry hanya menjadwalkan sumber yang perlu diperiksa, dan concurrency RDAP/DNS dapat diatur 1–32 (default 8).
+
+[Review kode dan alur kerja](docs/CODE-REVIEW-0.5.0.md) · [Layout kompak](docs/desktop-resume-compact.png)
+
+![Workspace resume — data sintetis](docs/desktop-resume.png)
 
 **Daftar besar v0.4.0:** satu impor menjadi satu pemeriksaan penuh, tanpa pemecahan per 1.000 domain atau batas file 5 MB. CSV/TXT/TSV langsung diparse dan dideduplikasi. Pratinjau input dan tabel dibagi per 200 baris; seluruh daftar tetap diproses, dicari, dan diekspor.
 

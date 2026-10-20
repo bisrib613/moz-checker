@@ -37,6 +37,13 @@
       "package_sha256": "63fb6f1b2d0a04e25aa7d808a2bd11e4b405a7a5b2563e8c49a84243415f3d92",
       "draft_release_id": 418508274,
       "decision": "User reported a missing HTTPS RDAP route for .fr despite its official IANA route. This exact C# preview refreshes missing cached routes, preserves unknown on failures, and passed 63 core tests per OS plus protected WPF smoke. Publish only after uploaded payload verification; earlier Python endpoint investigation remains unresolved."
+    },
+    "v0.5.0": {
+      "build_run_id": "39514795641",
+      "source_commit": "06c3f264b7f736d4d86fe578f09ca841d826dee8",
+      "package_sha256": "da08e8b1cafcafc54524e2b763552cc834d8da4a86c6a61e6a462b7dbfbca42c",
+      "draft_release_id": 418983169,
+      "decision": "User requested comprehensive code/workflow review, a composed desktop design and reliable continuation of pre-update work. Exact C# preview passed 92 core tests per OS, 9 publisher tests and protected WPF resume/compact smoke. Atomically persist paid reservation and quota; never repeat ambiguous paid requests. Publish only after downloaded payload verification. Earlier Python endpoint investigation remains unresolved."
     }
   }
 }
