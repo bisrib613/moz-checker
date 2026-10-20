@@ -123,12 +123,19 @@ def main():
     version = ET.fromstring(base64.b64decode(package['content'])).findtext('PropertyGroup/Version')
     if tag != 'v' + version:
         raise RuntimeError('Tag does not match tested application version')
+    draft_id = reviewed.get('draft_release_id')
     existing = subprocess.run(['gh', 'release', 'view', tag, '--repo', repository], capture_output=True)
-    if existing.returncode == 0:
+    if existing.returncode == 0 and not draft_id:
         raise RuntimeError('Release already exists; refusing to overwrite it')
     notes = Path('docs/releases') / (tag + '.md')
     if not notes.is_file():
         raise RuntimeError('Reviewed release notes are missing')
+    if draft_id:
+        draft = gh_json('api', f'repos/{repository}/releases/{draft_id}')
+        if not (draft['draft'] is True and draft['prerelease'] is True and draft['tag_name'] == tag
+                and draft['target_commitish'] == commit and not draft['assets']
+                and draft['body'] == notes.read_text() and draft['name'] == f'{tag} — Windows WPF Preview'):
+            raise RuntimeError('Prepared draft metadata differs from the reviewed release or already contains assets')
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         subprocess.run(['gh', 'run', 'download', run_id, '--repo', repository,
@@ -145,14 +152,21 @@ def main():
                         limitation='Limited runner testing does not resolve the earlier endpoint detection or establish a false positive.')
         evidence_file = root / 'SECURITY-VALIDATION.json'
         evidence_file.write_text(json.dumps(evidence, indent=2) + '\n')
-        subprocess.run(['gh', 'release', 'create', tag, str(root / 'MozChecker-Windows-x64.zip'),
-                        str(root / 'SHA256SUMS.txt'), str(evidence_file), '--repo', repository, '--target', commit,
-                        '--prerelease', '--title', f'{tag} — Windows WPF Preview',
-                        '--notes-file', str(notes)], check=True)
-        release = gh_json('api', f'repos/{repository}/releases/tags/{tag}')
+        if draft_id:
+            # Owner-created metadata avoids the integration's release-creation restriction.
+            # Upload only to the exact empty draft verified above. The owner publishes after verification.
+            subprocess.run(['gh', 'release', 'upload', tag, str(root / 'MozChecker-Windows-x64.zip'),
+                            str(root / 'SHA256SUMS.txt'), str(evidence_file), '--repo', repository], check=True)
+            release = gh_json('api', f'repos/{repository}/releases/{draft_id}')
+        else:
+            subprocess.run(['gh', 'release', 'create', tag, str(root / 'MozChecker-Windows-x64.zip'),
+                            str(root / 'SHA256SUMS.txt'), str(evidence_file), '--repo', repository, '--target', commit,
+                            '--prerelease', '--title', f'{tag} — Windows WPF Preview',
+                            '--notes-file', str(notes)], check=True)
+            release = gh_json('api', f'repos/{repository}/releases/tags/{tag}')
         assets = {asset['name']: asset for asset in release['assets']}
         expected_names = {'MozChecker-Windows-x64.zip', 'SHA256SUMS.txt', 'SECURITY-VALIDATION.json'}
-        if release['draft'] or not expected_names.issubset(assets):
+        if release['draft'] != bool(draft_id) or not expected_names.issubset(assets):
             raise RuntimeError('Published assets missing')
         for name in expected_names:
             asset = assets[name]
@@ -166,7 +180,7 @@ def main():
             raise RuntimeError('Uploaded asset size/state mismatch')
         if asset.get('digest') and asset['digest'] != 'sha256:' + digest:
             raise RuntimeError('GitHub asset digest mismatch')
-        print('Published:', release['html_url'])
+        print('Verified draft ready for owner publication:' if draft_id else 'Published:', release['html_url'])
         print('Verified SHA256:', digest)
 
 
