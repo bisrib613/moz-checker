@@ -17,6 +17,16 @@ try {
     New-Item -ItemType Directory -Path $auditRoot | Out-Null
     Copy-Item -Path $PackageDirectory -Destination (Join-Path $auditRoot 'MozChecker') -Recurse
     $exe = Join-Path $auditRoot 'MozChecker/MozChecker.exe'
+    # A .NET EXE is a native host: the managed DLLs and native dependencies are
+    # part of the tested payload too. Verify the entire copied package, not just the host.
+    $report.payloadFiles = @(Get-ChildItem -LiteralPath $PackageDirectory -Recurse -File | Sort-Object FullName | ForEach-Object {
+        $relative = [IO.Path]::GetRelativePath($PackageDirectory, $_.FullName)
+        $sha = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower()
+        $copied = Join-Path (Join-Path $auditRoot 'MozChecker') $relative
+        if (-not (Test-Path -LiteralPath $copied) -or $sha -ne (Get-FileHash -LiteralPath $copied -Algorithm SHA256).Hash.ToLower()) { throw 'Copied payload mismatch' }
+        [ordered]@{ path = $relative; sha256 = $sha; bytes = $_.Length }
+    })
+    if (@(Get-ChildItem -LiteralPath (Join-Path $auditRoot 'MozChecker') -Recurse -File).Count -ne $report.payloadFiles.Count) { throw 'Copied payload file count mismatch' }
     $report.exeSha256 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
     if ($report.exeSha256 -ne (Get-FileHash (Join-Path $PackageDirectory 'MozChecker.exe') -Algorithm SHA256).Hash.ToLower()) { throw 'Copied executable hash mismatch' }
     $report.authenticode = [string](Get-AuthenticodeSignature $exe).Status
@@ -97,7 +107,7 @@ try {
     if ($process -and -not $process.HasExited) { $process.Kill() }
     Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
     $report | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $ReportDirectory 'report.json') -Encoding utf8
-    Get-Content (Join-Path $ReportDirectory 'report.json')
+    [pscustomobject]@{ status = $report.status; appExecuted = $report.appExecuted; appExitCode = $report.appExitCode; exeSha256 = $report.exeSha256; payloadFileCount = $report.payloadFiles.Count; detectionCount = @($report.detections).Count; error = $report.error } | ConvertTo-Json
     Get-ChildItem -LiteralPath $auditRoot -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('smoke-error.txt', 'smoke-report.json') } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $ReportDirectory $_.Name) -ErrorAction SilentlyContinue }
     # Do not restore a quarantined file or use this test copy for distribution.
     Remove-Item -LiteralPath $auditRoot -Recurse -Force -ErrorAction SilentlyContinue
