@@ -1,4 +1,4 @@
-Moz Checker 0.3.1 - Windows 11 x64 / C# + WPF
+Moz Checker 0.3.2 - Windows 11 x64 / C# + WPF
 
 Requires Microsoft .NET 10 Desktop Runtime x64:
 https://dotnet.microsoft.com/en-us/download/dotnet/10.0
@@ -24,7 +24,7 @@ Available means an authoritative RDAP protocol 404 plus DNS NXDOMAIN. It is a
 candidate, not a registration guarantee. Confirm again at a registrar before buying.
 Moz uses legacy Links API v2 access ID + secret; v3 tokens are unsupported.
 
-Import: CSV/TXT/TSV files (up to 5 MB) are parsed immediately. Only normalized,
+Import: CSV/TXT/TSV files (no application file-size cap) are parsed immediately. Only normalized,
 unique domain names appear in the input. Comma, semicolon, tab and Excel sep=
 exports are recognized. A list larger than 1,000 domains is preserved and
 automatically split into queued huntings of up to 1,000 when you click Start.

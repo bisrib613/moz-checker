@@ -171,8 +171,6 @@ public partial class MainWindow : Window
         {
             var parsed = await Task.Run(() =>
             {
-                if (new FileInfo(dialog.FileName).Length > 5_000_000)
-                    throw new ArgumentException("File maksimal 5 MB.");
                 return Domains.Parse(File.ReadAllText(dialog.FileName), limit: null);
             });
             if (!closing)
