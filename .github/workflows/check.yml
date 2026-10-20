@@ -29,8 +29,8 @@ jobs:
         name: Test frozen desktop and package portable app
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath "$PWD/dist/MozChecker/MozChecker.exe" -ArgumentList "--smoke" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Frozen desktop smoke failed: $($process.ExitCode)" }
+          ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/dist/MozChecker" -ReportDirectory "$PWD/security-validation"
+          if ($LASTEXITCODE -ne 0) { throw "Windows security validation did not pass" }
           Compress-Archive -Path dist/MozChecker -DestinationPath dist/MozChecker-Windows-x64.zip
           $hash = (Get-FileHash dist/MozChecker-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  MozChecker-Windows-x64.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
@@ -42,3 +42,10 @@ jobs:
             dist/MozChecker-Windows-x64.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
+      - if: always() && runner.os == 'Windows'
+        name: Preserve Windows security validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-security-validation
+          path: security-validation/
+          if-no-files-found: warn

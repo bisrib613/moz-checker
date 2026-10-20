@@ -1,0 +1,5 @@
+{
+  "publishing_blocked": true,
+  "reason": "User endpoint quarantined MozChecker.exe as Behavior:Win32/DefenseEvasion.A!ml (Severe). Investigation unresolved; do not publish a replacement or bypass antivirus based only on functional/static scan results.",
+  "reported_version_under_test": "v0.2.0"
+}

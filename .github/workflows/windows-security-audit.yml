@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Inspect published package with Microsoft Defender
         shell: pwsh
         env:
@@ -26,6 +28,9 @@ jobs:
           AUDIT_VERSION: ${{ inputs.version }}
           EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
         run: ./scripts/audit-windows-package.ps1
+      - name: Check startup with real-time and behavior protection enabled
+        shell: pwsh
+        run: ./scripts/test-windows-package-security.ps1 -PackageDirectory "$PWD/security-audit/unpacked/MozChecker" -ReportDirectory "$PWD/security-audit/protected-startup"
       - name: Save diagnostic evidence even when scanning fails
         if: always()
         uses: actions/upload-artifact@v4
@@ -34,4 +39,5 @@ jobs:
           path: |
             security-audit/report.json
             security-audit/defender-scan.txt
+            security-audit/protected-startup/
           if-no-files-found: warn

@@ -40,6 +40,9 @@ def verify_package(root):
 
 
 def main():
+    security = json.loads(Path('release-security.json').read_text())
+    if security.get('publishing_blocked', True):
+        raise RuntimeError('Release publication on hold: ' + security.get('reason', 'security review required'))
     repository = os.environ['GH_REPO']
     tag = os.environ['RELEASE_TAG']
     run_id = os.environ['BUILD_RUN_ID']
